@@ -11,6 +11,7 @@ import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.TextView
 import android.widget.Switch
+import androidx.appcompat.content.res.AppCompatResources
 
 data class SettingsEntry(
     val icon: Int,
@@ -47,7 +48,7 @@ class SettingsListAdapter(
             descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
 
             addView(ImageView(context).apply {
-                setImageResource(entry.icon)
+                setImageDrawable(AppCompatResources.getDrawable(context, entry.icon))
                 scaleType = ImageView.ScaleType.CENTER_INSIDE
             }, LinearLayout.LayoutParams(dp(28), dp(28)))
 
@@ -70,7 +71,10 @@ class SettingsListAdapter(
                     }
                     nextFocusDownId = actionIds[(position + 1).coerceAtMost(entries.lastIndex)]
                     isChecked = entry.checked
-                    showText = false
+                    // showText is API21+; empty on/off text hides the label on every API
+                    // (null would NPE in KitKat Switch.onMeasure -> makeLayout).
+                    setTextOn("")
+                    setTextOff("")
                     contentDescription = "focus:settings:${entry.title}"
                     isFocusable = true
                     isFocusableInTouchMode = false

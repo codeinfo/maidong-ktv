@@ -11,6 +11,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.appcompat.content.res.AppCompatResources
 import kotlin.math.ceil
 
 data class SongRowState(
@@ -176,7 +177,7 @@ class SongListAdapter(
                 addView(ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal).apply {
                     max = 100
                     progress = state.progress
-                    progressDrawable = context.getDrawable(R.drawable.bg_download_progress)
+                    progressDrawable = AppCompatResources.getDrawable(context, R.drawable.bg_download_progress)
                 }, LinearLayout.LayoutParams(dp(90), dp(8)).apply { marginEnd = dp(6) })
             }
             when {
@@ -230,7 +231,7 @@ class SongListAdapter(
     }
 
     private fun icon(resource: Int, action: (() -> Unit)?): ImageView = ImageView(context).apply {
-        setImageResource(resource)
+        setImageDrawable(AppCompatResources.getDrawable(context, resource))
         scaleType = ImageView.ScaleType.CENTER_INSIDE
         setPadding(dp(7), dp(7), dp(7), dp(7))
         isFocusable = action != null

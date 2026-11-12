@@ -34,6 +34,7 @@ import android.text.TextUtils
 import android.text.TextWatcher
 import android.util.Log
 import android.view.Gravity
+import android.view.ContextThemeWrapper
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
@@ -61,7 +62,10 @@ import android.widget.TextView
 import android.widget.TextView.OnEditorActionListener
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.FileProvider
+import androidx.core.view.ViewCompat
+import androidx.core.widget.ImageViewCompat
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 import com.local.ktv.KtvStore.Companion.stableId
@@ -100,8 +104,6 @@ import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.util.function.Function
-import java.util.function.ToIntFunction
 import kotlin.Any
 import kotlin.Array
 import kotlin.Boolean
@@ -1857,7 +1859,7 @@ class MainActivity : AppCompatActivity() {
                 clipToPadding = false
             }
             val icon = ImageView(this).apply {
-                setImageResource(iconRes)
+                setImageDrawable(AppCompatResources.getDrawable(this@MainActivity, iconRes))
                 scaleType = ImageView.ScaleType.CENTER_INSIDE
             }
             val caption = label(text, 12, Color.WHITE).apply {
@@ -3623,10 +3625,7 @@ class MainActivity : AppCompatActivity() {
                 song
             )
         }
-        Collections.sort<Song?>(
-            visibleSongs,
-            Comparator.comparing<Song?, String?>(Function { song: Song? -> song!!.title!!.lowercase() })
-        )
+        visibleSongs.sortBy { it.title!!.lowercase() }
         renderSongs()
     }
 
@@ -3640,10 +3639,7 @@ class MainActivity : AppCompatActivity() {
                 ))
             ) visibleSongs.add(song)
         }
-        Collections.sort<Song?>(
-            visibleSongs,
-            Comparator.comparing<Song?, String?>(Function { song: Song? -> song!!.title!!.lowercase() })
-        )
+        visibleSongs.sortBy { it.title!!.lowercase() }
         renderSongs()
     }
 
@@ -3698,10 +3694,7 @@ class MainActivity : AppCompatActivity() {
                 song
             )
         }
-        Collections.sort<Song?>(
-            visibleSongs,
-            Comparator.comparing<Song?, String?>(Function { song: Song? -> song!!.title!!.lowercase() })
-        )
+        visibleSongs.sortBy { it.title!!.lowercase() }
         renderSongs()
         if (pageInfo != null) pageInfo!!.setText("本地 " + visibleSongs.size + " 首")
     }
@@ -4214,9 +4207,9 @@ class MainActivity : AppCompatActivity() {
             vocalActionIcon(),
         )
         fullScreenPauseText?.text = if (playing) "暂停" else "播放"
-        fullScreenPauseIcon?.setImageResource(if (playing) R.drawable.ott_ic_ctrl_pause else R.drawable.ott_ic_ctrl_play)
+        fullScreenPauseIcon?.setImageDrawable(AppCompatResources.getDrawable(this, if (playing) R.drawable.ott_ic_ctrl_pause else R.drawable.ott_ic_ctrl_play))
         fullScreenVocalText?.text = vocalActionText()
-        fullScreenVocalIcon?.setImageResource(vocalActionIcon())
+        fullScreenVocalIcon?.setImageDrawable(AppCompatResources.getDrawable(this, vocalActionIcon()))
         playerController?.updatePlayState(playing)
         playerController?.setVocalMode(originalVocal)
         syncPlayerInfo()
@@ -4701,10 +4694,7 @@ class MainActivity : AppCompatActivity() {
             BufferedReader(InputStreamReader(FileInputStream(file), "UTF-8")).use { reader ->
                 var line: String?
                 while ((reader.readLine().also { line = it }) != null) parseLyricLine(line)
-                Collections.sort<LyricLine?>(
-                    lyricLines, Comparator.comparingInt<LyricLine?>(
-                        ToIntFunction { item: LyricLine? -> item!!.timeMs })
-                )
+                lyricLines.sortBy { it!!.timeMs }
                 updateLyricView()
             }
         } catch (e: Exception) {
@@ -4817,8 +4807,8 @@ class MainActivity : AppCompatActivity() {
             isClickable = true
             setBackgroundResource(R.drawable.bg_song_action_focus)
             addView(ImageView(this@MainActivity).apply {
-                setImageResource(iconRes)
-                iconTint?.let { imageTintList = ColorStateList.valueOf(it) }
+                setImageDrawable(AppCompatResources.getDrawable(this@MainActivity, iconRes))
+                iconTint?.let { ImageViewCompat.setImageTintList(this, ColorStateList.valueOf(it)) }
                 setPadding(dp(18), dp(18), dp(18), dp(18))
                 background = GradientDrawable().apply {
                     shape = GradientDrawable.OVAL
@@ -5352,7 +5342,7 @@ class MainActivity : AppCompatActivity() {
     /** 子页面二级分类滚动容器(语种筛选)  */
     private var subCategoryScroll: HorizontalScrollView? = null
     private var keyboardArea: View? = null
-    private var rankCategoryGrid: GridLayout? = null
+    private var rankCategoryGrid: LinearLayout? = null
     private var paginationBar: View? = null
     private var fullScreenContainer: FrameLayout? = null
     private var isFullScreen = false
@@ -5622,7 +5612,7 @@ class MainActivity : AppCompatActivity() {
                 isClickable = false
                 isFocusable = false
                 visibility = View.GONE
-                elevation = dp(6).toFloat()
+                ViewCompat.setElevation(this, dp(6).toFloat())
             }.also { root.addView(it, insertionIndex + 1, FrameLayout.LayoutParams(1, 1)) }
             playbackModeNotice = TextView(this).apply {
                 gravity = Gravity.CENTER
@@ -5630,7 +5620,7 @@ class MainActivity : AppCompatActivity() {
                 setTextColor(Color.WHITE)
                 visibility = View.GONE
                 alpha = 0f
-                elevation = dp(8).toFloat()
+                ViewCompat.setElevation(this, dp(8).toFloat())
             }.also { root.addView(it, insertionIndex + 1, FrameLayout.LayoutParams(dp(104), dp(104))) }
             songIntroNotice = TextView(this).apply {
                 gravity = Gravity.CENTER_VERTICAL
@@ -5640,7 +5630,7 @@ class MainActivity : AppCompatActivity() {
                 maxLines = 2
                 visibility = View.GONE
                 alpha = 0f
-                elevation = dp(7).toFloat()
+                ViewCompat.setElevation(this, dp(7).toFloat())
             }.also { root.addView(it, insertionIndex + 1, FrameLayout.LayoutParams(dp(330), dp(92))) }
             songIntroIcon = TextView(this).apply {
                 text = "♫"
@@ -5653,7 +5643,7 @@ class MainActivity : AppCompatActivity() {
                 ).apply { shape = GradientDrawable.OVAL; setStroke(dp(3), Color.argb(210, 255, 255, 255)) }
                 visibility = View.GONE
                 alpha = 0f
-                elevation = dp(9).toFloat()
+                ViewCompat.setElevation(this, dp(9).toFloat())
             }.also { root.addView(it, insertionIndex + 2, FrameLayout.LayoutParams(dp(78), dp(78))) }
         }
         homeVideo = persistentVideo
@@ -5696,7 +5686,7 @@ class MainActivity : AppCompatActivity() {
             homeCardFavorite, homeCardCategory,
         ).forEach(::installPressFeedback)
         listOfNotNull(homePlayerHost, subPagePlayerHost, homePoster).forEach(TvFocusStyler::preserveBackground)
-        (homePoster as? FrameLayout)?.foreground = getDrawable(R.drawable.bg_player_focus)
+        (homePoster as? FrameLayout)?.foreground = AppCompatResources.getDrawable(this, R.drawable.bg_player_focus)
         configureTvFocusNavigation()
         prepareTvFocusableTree(window.decorView)
 
@@ -6682,41 +6672,46 @@ class MainActivity : AppCompatActivity() {
     private fun updateRankCategoryGrid() {
         val grid = rankCategoryGrid ?: return
         grid.removeAllViews()
-        currentCategories.take(9).forEachIndexed { index, title ->
-            val tile = TextView(this).apply {
-                text = title
-                textSize = 14f
-                setTextColor(Color.WHITE)
-                gravity = Gravity.CENTER
-                isClickable = true
-                isFocusable = true
-                setBackgroundResource(
-                    if (index == currentCategoryIndex) R.drawable.ott_bg_rank_item_selected
-                    else R.drawable.ott_bg_rank_item_not_selected
-                )
-                val trophy = getDrawable(R.drawable.ic_default_rank_avatar)?.mutate()
-                trophy?.setBounds(0, 0, dp(42), dp(42))
-                setCompoundDrawables(null, trophy, null, null)
-                compoundDrawablePadding = dp(1)
-                setOnClickListener {
-                    if (index == currentCategoryIndex) return@setOnClickListener
-                    currentCategoryIndex = index
-                    browseMode = "rank"
-                    browseParam = rankPlaylistIds.getOrNull(index).orEmpty()
-                    browsePage = 0
-                    listTitle?.text = title
-                    updateRankCategoryGrid()
-                    loadBrowsePage()
+        val categories = currentCategories.take(9)
+        categories.chunked(3).forEachIndexed { rowIndex, rowTitles ->
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            grid.addView(row, LinearLayout.LayoutParams(-1, 0, 1f))
+            rowTitles.forEachIndexed { columnIndex, title ->
+                val index = rowIndex * 3 + columnIndex
+                val tile = TextView(this).apply {
+                    text = title
+                    textSize = 14f
+                    setTextColor(Color.WHITE)
+                    gravity = Gravity.CENTER
+                    isClickable = true
+                    isFocusable = true
+                    setBackgroundResource(
+                        if (index == currentCategoryIndex) R.drawable.ott_bg_rank_item_selected
+                        else R.drawable.ott_bg_rank_item_not_selected
+                    )
+                    val trophy = AppCompatResources.getDrawable(this@MainActivity, R.drawable.ic_default_rank_avatar)?.mutate()
+                    trophy?.setBounds(0, 0, dp(42), dp(42))
+                    setCompoundDrawables(null, trophy, null, null)
+                    compoundDrawablePadding = dp(1)
+                    setOnClickListener {
+                        if (index == currentCategoryIndex) return@setOnClickListener
+                        currentCategoryIndex = index
+                        browseMode = "rank"
+                        browseParam = rankPlaylistIds.getOrNull(index).orEmpty()
+                        browsePage = 0
+                        listTitle?.text = title
+                        updateRankCategoryGrid()
+                        loadBrowsePage()
+                    }
                 }
+                installPressFeedback(tile)
+                row.addView(tile, LinearLayout.LayoutParams(0, -1, 1f).apply {
+                    setMargins(dp(3), dp(3), dp(3), dp(3))
+                })
             }
-            installPressFeedback(tile)
-            grid.addView(tile, GridLayout.LayoutParams().apply {
-                rowSpec = GridLayout.spec(index / 3, 1f)
-                columnSpec = GridLayout.spec(index % 3, 1f)
-                width = 0
-                height = 0
-                setMargins(dp(3), dp(3), dp(3), dp(3))
-            })
+            repeat(3 - rowTitles.size) {
+                row.addView(View(this), LinearLayout.LayoutParams(0, -1, 1f))
+            }
         }
     }
 
@@ -7075,7 +7070,7 @@ class MainActivity : AppCompatActivity() {
                 .plus(library.allSongs().asSequence())
                 .forEach { song ->
                 if (song.hasLocalFile() || isDownloaded(song)) {
-                    localSongs.putIfAbsent(stableId(song), song)
+                    localSongs.getOrPut(stableId(song)) { song }
                 }
             }
             val filtered = localSongs.values.filter {
@@ -7265,7 +7260,7 @@ class MainActivity : AppCompatActivity() {
             val resolved = File(MuseDatabase.resolveSongFilePath(song))
             if (resolved.isFile && resolved.length() >= SongOkDownloadManager.MIN_VALID_FILE_SIZE) {
                 song.path = resolved.absolutePath
-                result.putIfAbsent(stableId(song), song)
+                result.getOrPut(stableId(song)) { song }
             }
         }
 
@@ -7287,13 +7282,13 @@ class MainActivity : AppCompatActivity() {
         val databaseSongs = library.muse.songsByFilenames(filesByName.keys)
         databaseSongs.forEach { song ->
             filesByName[song.filename]?.let { song.path = it.absolutePath }
-            result.putIfAbsent(stableId(song), song)
+            result.getOrPut(stableId(song)) { song }
         }
         val matchedNames = databaseSongs.mapNotNullTo(HashSet()) { it.filename }
         validFiles.filter { it.name !in matchedNames }.forEach { file ->
             val song = Song.local(file.absolutePath, file.name)
             song.filename = file.name
-            result.putIfAbsent(stableId(song), song)
+            result.getOrPut(stableId(song)) { song }
         }
         return result
     }
@@ -7376,7 +7371,7 @@ class MainActivity : AppCompatActivity() {
                 setBackgroundColor(Color.rgb(24, 17, 45))
                 isClickable = true
                 isFocusable = true
-                elevation = dp(30).toFloat()
+                ViewCompat.setElevation(this, dp(30).toFloat())
             }
             val center = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
@@ -7385,7 +7380,7 @@ class MainActivity : AppCompatActivity() {
                     setImageResource(R.drawable.ktv_logo)
                     scaleType = ImageView.ScaleType.CENTER_INSIDE
                 }, LinearLayout.LayoutParams(dp(112), dp(112)))
-                addView(ProgressBar(this@MainActivity, null, 0, R.style.LoadingProgressBar), LinearLayout.LayoutParams(dp(54), dp(54)).apply {
+                addView(ProgressBar(ContextThemeWrapper(this@MainActivity, R.style.LoadingProgressBarTheme)), LinearLayout.LayoutParams(dp(54), dp(54)).apply {
                     topMargin = dp(22)
                 })
                 databaseLoadingText = TextView(this@MainActivity).apply {
@@ -7397,7 +7392,7 @@ class MainActivity : AppCompatActivity() {
                 addView(databaseLoadingText, LinearLayout.LayoutParams(dp(620), -2))
                 databaseLoadingProgress = ProgressBar(this@MainActivity, null, android.R.attr.progressBarStyleHorizontal).apply {
                     max = 100
-                    progressDrawable = getDrawable(R.drawable.bg_download_progress)
+                    progressDrawable = AppCompatResources.getDrawable(this@MainActivity, R.drawable.bg_download_progress)
                 }
                 addView(databaseLoadingProgress, LinearLayout.LayoutParams(dp(620), dp(10)))
             }

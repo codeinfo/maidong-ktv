@@ -41,6 +41,11 @@
         <item name="android:indeterminateBehavior">repeat</item>
     </style>
 
+    <!-- API 19 没有 ProgressBar 的四参构造,用主题把样式喂给三参构造 -->
+    <style name="LoadingProgressBarTheme">
+        <item name="android:progressBarStyle">@style/LoadingProgressBar</item>
+    </style>
+
     <!-- 自定义进度条样式(com.hhc.muse.progressbar.CustomProgressBar):8 种配色主题 -->
     <style name="CustomProgressBar_Beauty_Red">
         <item name="android:layout_width">fill_parent</item>

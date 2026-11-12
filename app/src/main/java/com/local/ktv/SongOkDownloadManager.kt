@@ -8,6 +8,7 @@ import com.liulishuo.okdownload.core.cause.EndCause
 import com.liulishuo.okdownload.core.cause.ResumeFailedCause
 import com.liulishuo.okdownload.core.listener.DownloadListener2
 import java.io.File
+import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -28,12 +29,12 @@ object SongOkDownloadManager {
     }
 
     private val tasks = ConcurrentHashMap<String, OkDownloadTask>()
-    private val pending = ConcurrentHashMap.newKeySet<String>()
+    private val pending = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
     private val callbacks = ConcurrentHashMap<String, DownloadCallback>()
     private val progress = ConcurrentHashMap<String, Int>()
     private val totalLengths = ConcurrentHashMap<String, Long>()
     private val forcedRetryReasons = ConcurrentHashMap<String, String>()
-    private val manuallyCanceled = ConcurrentHashMap.newKeySet<String>()
+    private val manuallyCanceled = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
     private val io = Executors.newFixedThreadPool(4)
     private val watchdog = Executors.newSingleThreadScheduledExecutor()
 

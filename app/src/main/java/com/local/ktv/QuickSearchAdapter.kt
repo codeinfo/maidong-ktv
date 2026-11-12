@@ -1,18 +1,20 @@
 package com.local.ktv
 
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.graphics.Color
-import android.graphics.Outline
+import android.graphics.drawable.Drawable
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewOutlineProvider
 import android.widget.BaseAdapter
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.appcompat.content.res.AppCompatResources
+import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 import kotlin.math.ceil
 
 class QuickSearchAdapter(
@@ -67,12 +69,8 @@ class QuickSearchAdapter(
         contentDescription = "focus:singer:${singer.getOrNull(0) ?: name}"
         val type = singer.getOrNull(2).orEmpty()
         addView(ImageView(context).apply {
-            setImageResource(defaultAvatar(type, name))
+            setImageDrawable(circularAvatar(defaultAvatar(type, name)))
             scaleType = ImageView.ScaleType.CENTER_CROP
-            outlineProvider = object : ViewOutlineProvider() {
-                override fun getOutline(view: View, outline: Outline) = outline.setOval(0, 0, view.width, view.height)
-            }
-            clipToOutline = true
         }, LinearLayout.LayoutParams(dp(88), dp(88)).apply { topMargin = dp(5) })
         addView(TextView(context).apply {
             text = name
@@ -115,7 +113,7 @@ class QuickSearchAdapter(
             }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
         addView(ImageView(context).apply {
-            setImageResource(R.drawable.ott_ic_more)
+            setImageDrawable(AppCompatResources.getDrawable(context, R.drawable.ott_ic_more))
             setPadding(dp(8), dp(8), dp(8), dp(8))
             isClickable = false
             isFocusable = false
@@ -136,6 +134,10 @@ class QuickSearchAdapter(
             false
         }
     }
+
+    private fun circularAvatar(resource: Int): Drawable =
+        RoundedBitmapDrawableFactory.create(context.resources, BitmapFactory.decodeResource(context.resources, resource))
+            .apply { isCircular = true }
 
     private fun defaultAvatar(type: String, name: String): Int {
         val variant = (name.hashCode() and Int.MAX_VALUE) % 5

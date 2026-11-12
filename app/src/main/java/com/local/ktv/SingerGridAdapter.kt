@@ -1,17 +1,19 @@
 package com.local.ktv
 
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.graphics.Color
-import android.graphics.Outline
+import android.graphics.drawable.Drawable
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewOutlineProvider
+import android.widget.AbsListView
 import android.widget.BaseAdapter
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 import kotlin.math.ceil
 
 /** Four-column singer grid matching the original OTT singer page. */
@@ -30,7 +32,8 @@ class SingerGridAdapter(
         val row = (convertView as? LinearLayout) ?: LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(145))
+            // ListView.measureScrapChild casts row params to AbsListView.LayoutParams on API19.
+            layoutParams = AbsListView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(145))
         }
         row.removeAllViews()
         repeat(COLUMN_COUNT) { column ->
@@ -56,13 +59,7 @@ class SingerGridAdapter(
 
             val avatar = ImageView(context).apply {
                 scaleType = ImageView.ScaleType.CENTER_CROP
-                setImageResource(defaultAvatar(type, name))
-                outlineProvider = object : ViewOutlineProvider() {
-                    override fun getOutline(view: View, outline: Outline) {
-                        outline.setOval(0, 0, view.width, view.height)
-                    }
-                }
-                clipToOutline = true
+                setImageDrawable(circularAvatar(defaultAvatar(type, name)))
             }
             addView(avatar, LinearLayout.LayoutParams(dp(88), dp(88)).apply { topMargin = dp(21) })
 
@@ -87,6 +84,10 @@ class SingerGridAdapter(
             TvFocusStyler.install(this)
         }
     }
+
+    private fun circularAvatar(resource: Int): Drawable =
+        RoundedBitmapDrawableFactory.create(context.resources, BitmapFactory.decodeResource(context.resources, resource))
+            .apply { isCircular = true }
 
     private fun defaultAvatar(type: String, name: String): Int {
         val variant = (name.hashCode() and Int.MAX_VALUE) % 5

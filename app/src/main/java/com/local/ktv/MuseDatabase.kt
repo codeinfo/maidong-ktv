@@ -498,9 +498,9 @@ class MuseDatabase @JvmOverloads constructor(initialSourceFile: File? = null) {
 
     companion object {
         private const val TAG = "MuseDatabase"
-        private const val DEFAULT_DB_PATH = "${AppPaths.ROOT_PATH}/database/muse.db"
+        private val DEFAULT_DB_PATH = "${AppPaths.ROOT_PATH}/database/muse.db"
         const val PAGE_SIZE = 10
-        const val VIDEO_ROOT = AppPaths.VIDEO_PATH
+        val VIDEO_ROOT = AppPaths.VIDEO_PATH
         const val CLOUD_SONG_DIR = "cloud-song"
         const val LOCAL_SONG_DIR = "local"
 

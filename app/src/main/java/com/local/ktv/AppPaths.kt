@@ -1,13 +1,16 @@
 package com.local.ktv
 
+import android.os.Environment
 import java.io.File
 
 /** The only external-storage namespace used by the fresh Maidong KTV app. */
 object AppPaths {
-    const val ROOT_PATH = "/storage/emulated/0/MaidongKTV"
-    const val VIDEO_PATH = "$ROOT_PATH/video"
+    private val externalStorage = Environment.getExternalStorageDirectory()
 
-    val root = File(ROOT_PATH)
+    val root = File(externalStorage, "MaidongKTV")
+    val ROOT_PATH = root.absolutePath
+    val VIDEO_PATH = File(root, "video").absolutePath
+
     val stateFile = File(root, "state.json")
     val songsDir = File(root, "songs")
     val importDir = File(root, "import")
@@ -30,6 +33,6 @@ object AppPaths {
 
     /** The original IJK binary creates this log folder internally; remove it after native startup. */
     fun removeNativeLegacyLogDirectory() {
-        File("/storage/emulated/0/muse").deleteRecursively()
+        File(externalStorage, "muse").deleteRecursively()
     }
 }
