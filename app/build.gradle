@@ -15,8 +15,14 @@ android {
         versionName "1.1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
-        def manifestUrl = project.findProperty("GITEE_DATABASE_MANIFEST_URL") ?: ""
-        buildConfigField "String", "GITEE_DATABASE_MANIFEST_URL", "\"${manifestUrl}\""
+        // 曲库清单地址；分片按清单所在目录解析，镜像地址可指向同一份数据的其他托管位置。
+        def manifestUrl = project.findProperty("DATABASE_MANIFEST_URL") ?: ""
+        buildConfigField "String", "DATABASE_MANIFEST_URL", "\"${manifestUrl}\""
+        def manifestMirrors = project.findProperty("DATABASE_MANIFEST_MIRRORS") ?: ""
+        buildConfigField "String", "DATABASE_MANIFEST_MIRRORS", "\"${manifestMirrors}\""
+        // 可选：访问需要登录的镜像（如 Gitee 大文件）时使用的访问令牌。
+        def downloadToken = project.findProperty("DATABASE_TOKEN") ?: ""
+        buildConfigField "String", "DATABASE_TOKEN", "\"${downloadToken}\""
 
     }
 

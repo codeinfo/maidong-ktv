@@ -36,7 +36,7 @@ class MuseDatabase @JvmOverloads constructor(initialSourceFile: File? = null) {
 
     fun dbFile(): File? = sourceFile
 
-    fun songCount(): Int = count("SELECT COUNT(*) FROM songs WHERE available=1 AND deleted_at IS NULL")
+    fun songCount(): Int = count("SELECT COUNT(*) FROM songs WHERE deleted_at IS NULL")
 
     fun singerCount(): Int = count("SELECT COUNT(*) FROM singers WHERE deleted_at IS NULL AND name != ''")
 
@@ -54,7 +54,7 @@ class MuseDatabase @JvmOverloads constructor(initialSourceFile: File? = null) {
         args += limit.toString()
         args += offset.toString()
         return songs(
-            "$SONG_SELECT WHERE s.available=1 AND s.deleted_at IS NULL " +
+            "$SONG_SELECT WHERE s.deleted_at IS NULL " +
                 "AND $condition$languageCondition " +
                 "$RECOMMEND_ORDER, s.name ASC LIMIT ? OFFSET ?",
             args.toTypedArray(),
@@ -73,7 +73,7 @@ class MuseDatabase @JvmOverloads constructor(initialSourceFile: File? = null) {
             ""
         }
         return count(
-            "SELECT COUNT(*) FROM songs WHERE available=1 AND deleted_at IS NULL " +
+            "SELECT COUNT(*) FROM songs WHERE deleted_at IS NULL " +
                 "AND $condition$languageCondition",
             args.toTypedArray(),
         )
@@ -136,19 +136,19 @@ class MuseDatabase @JvmOverloads constructor(initialSourceFile: File? = null) {
     }
 
     fun hotSongs(offset: Int, limit: Int): MutableList<Song> = songs(
-        "$SONG_SELECT WHERE s.available=1 AND s.deleted_at IS NULL $RECOMMEND_ORDER LIMIT ? OFFSET ?",
+        "$SONG_SELECT WHERE s.deleted_at IS NULL $RECOMMEND_ORDER LIMIT ? OFFSET ?",
         pageArgs(limit, offset),
     )
 
     fun quickSongs(limit: Int): MutableList<Song> = songs(
-        "$SONG_SELECT WHERE s.available=1 AND s.deleted_at IS NULL LIMIT ?",
+        "$SONG_SELECT WHERE s.deleted_at IS NULL LIMIT ?",
         arrayOf(limit.toString()),
     )
 
     fun songsByLanguage(language: String?, offset: Int, limit: Int): MutableList<Song> {
         if (language.isNullOrEmpty() || language == "全部") return hotSongs(offset, limit)
         return songs(
-            "$SONG_SELECT WHERE s.available=1 AND s.deleted_at IS NULL AND s.lang=? $RECOMMEND_ORDER LIMIT ? OFFSET ?",
+            "$SONG_SELECT WHERE s.deleted_at IS NULL AND s.lang=? $RECOMMEND_ORDER LIMIT ? OFFSET ?",
             arrayOf(language, limit.toString(), offset.toString()),
         )
     }
@@ -157,7 +157,7 @@ class MuseDatabase @JvmOverloads constructor(initialSourceFile: File? = null) {
         songCount()
     } else {
         count(
-            "SELECT COUNT(*) FROM songs WHERE available=1 AND deleted_at IS NULL AND lang=?",
+            "SELECT COUNT(*) FROM songs WHERE deleted_at IS NULL AND lang=?",
             arrayOf(language),
         )
     }
@@ -166,7 +166,7 @@ class MuseDatabase @JvmOverloads constructor(initialSourceFile: File? = null) {
         if (wordCount <= 0) return hotSongs(offset, limit)
         val condition = if (wordCount >= 6) "s.name_len >= 6" else "s.name_len = $wordCount"
         return songs(
-            "$SONG_SELECT WHERE s.available=1 AND s.deleted_at IS NULL AND $condition $RECOMMEND_ORDER LIMIT ? OFFSET ?",
+            "$SONG_SELECT WHERE s.deleted_at IS NULL AND $condition $RECOMMEND_ORDER LIMIT ? OFFSET ?",
             pageArgs(limit, offset),
         )
     }
@@ -174,7 +174,7 @@ class MuseDatabase @JvmOverloads constructor(initialSourceFile: File? = null) {
     fun countByWordCount(wordCount: Int): Int {
         if (wordCount <= 0) return songCount()
         val condition = if (wordCount >= 6) "name_len >= 6" else "name_len = $wordCount"
-        return count("SELECT COUNT(*) FROM songs WHERE available=1 AND deleted_at IS NULL AND $condition")
+        return count("SELECT COUNT(*) FROM songs WHERE deleted_at IS NULL AND $condition")
     }
 
     fun languages(): MutableList<String> = stringRows(
@@ -210,14 +210,14 @@ class MuseDatabase @JvmOverloads constructor(initialSourceFile: File? = null) {
 
     fun songsBySinger(singerId: String, offset: Int, limit: Int): MutableList<Song> = songs(
         "$SONG_SELECT INNER JOIN song_singer_relations ssr ON s.id=ssr.song_id " +
-            "WHERE ssr.singer_id=? AND s.available=1 AND s.deleted_at IS NULL " +
+            "WHERE ssr.singer_id=? AND s.deleted_at IS NULL " +
             "$RECOMMEND_ORDER LIMIT ? OFFSET ?",
         arrayOf(singerId, limit.toString(), offset.toString()),
     )
 
     fun countSongsBySinger(singerId: String): Int = count(
         "SELECT COUNT(*) FROM song_singer_relations ssr INNER JOIN songs s ON s.id=ssr.song_id " +
-            "WHERE ssr.singer_id=? AND s.available=1 AND s.deleted_at IS NULL",
+            "WHERE ssr.singer_id=? AND s.deleted_at IS NULL",
         arrayOf(singerId),
     )
 
@@ -235,7 +235,7 @@ class MuseDatabase @JvmOverloads constructor(initialSourceFile: File? = null) {
         args += offset.toString()
         return songs(
             "$SONG_SELECT INNER JOIN song_singer_relations ssr ON s.id=ssr.song_id " +
-                "WHERE ssr.singer_id=? AND s.available=1 AND s.deleted_at IS NULL AND $condition " +
+                "WHERE ssr.singer_id=? AND s.deleted_at IS NULL AND $condition " +
                 "$RECOMMEND_ORDER LIMIT ? OFFSET ?",
             args.toTypedArray(),
         )
@@ -248,7 +248,7 @@ class MuseDatabase @JvmOverloads constructor(initialSourceFile: File? = null) {
         val condition = songKeywordCondition(query, args)
         return count(
             "SELECT COUNT(*) FROM songs s INNER JOIN song_singer_relations ssr ON s.id=ssr.song_id " +
-                "WHERE ssr.singer_id=? AND s.available=1 AND s.deleted_at IS NULL AND $condition",
+                "WHERE ssr.singer_id=? AND s.deleted_at IS NULL AND $condition",
             args.toTypedArray(),
         )
     }
@@ -256,7 +256,7 @@ class MuseDatabase @JvmOverloads constructor(initialSourceFile: File? = null) {
     fun songsBySingerName(singerName: String, offset: Int, limit: Int): MutableList<Song> {
         val pattern = "%$singerName%"
         return songs(
-            "$SONG_SELECT WHERE s.available=1 AND s.deleted_at IS NULL " +
+            "$SONG_SELECT WHERE s.deleted_at IS NULL " +
                 "AND (s.singer_names LIKE ? OR s.id IN (SELECT ssr.song_id FROM song_singer_relations ssr " +
                 "INNER JOIN singers sg ON ssr.singer_id=sg.id WHERE sg.name LIKE ?)) " +
                 "$RECOMMEND_ORDER LIMIT ? OFFSET ?",
@@ -267,7 +267,7 @@ class MuseDatabase @JvmOverloads constructor(initialSourceFile: File? = null) {
     fun countSongsBySingerName(singerName: String): Int {
         val pattern = "%$singerName%"
         return count(
-            "SELECT COUNT(*) FROM songs s WHERE s.available=1 AND s.deleted_at IS NULL " +
+            "SELECT COUNT(*) FROM songs s WHERE s.deleted_at IS NULL " +
                 "AND (s.singer_names LIKE ? OR s.id IN (SELECT ssr.song_id FROM song_singer_relations ssr " +
                 "INNER JOIN singers sg ON ssr.singer_id=sg.id WHERE sg.name LIKE ?))",
             arrayOf(pattern, pattern),
@@ -295,7 +295,7 @@ class MuseDatabase @JvmOverloads constructor(initialSourceFile: File? = null) {
 
     fun rankSongCount(playlistId: String): Int = count(
         "SELECT COUNT(*) FROM playlist_songs ps INNER JOIN songs s ON s.id=ps.song_id " +
-            "WHERE ps.playlist_id=? AND s.available=1 AND s.deleted_at IS NULL",
+            "WHERE ps.playlist_id=? AND s.deleted_at IS NULL",
         arrayOf(playlistId),
     )
 
@@ -338,7 +338,7 @@ class MuseDatabase @JvmOverloads constructor(initialSourceFile: File? = null) {
 
     fun songsInPlaylist(playlistId: String, offset: Int, limit: Int): MutableList<Song> = songs(
         "$SONG_SELECT INNER JOIN playlist_songs ps ON s.id=ps.song_id " +
-            "WHERE ps.playlist_id=? AND s.available=1 AND s.deleted_at IS NULL " +
+            "WHERE ps.playlist_id=? AND s.deleted_at IS NULL " +
             "ORDER BY ps.sort_no ASC LIMIT ? OFFSET ?",
         arrayOf(playlistId, limit.toString(), offset.toString()),
     )
@@ -357,7 +357,7 @@ class MuseDatabase @JvmOverloads constructor(initialSourceFile: File? = null) {
         args += offset.toString()
         return songs(
             "$SONG_SELECT INNER JOIN playlist_songs ps ON s.id=ps.song_id " +
-                "WHERE ps.playlist_id=? AND s.available=1 AND s.deleted_at IS NULL AND $condition " +
+                "WHERE ps.playlist_id=? AND s.deleted_at IS NULL AND $condition " +
                 "ORDER BY ps.sort_no ASC LIMIT ? OFFSET ?",
             args.toTypedArray(),
         )
@@ -370,7 +370,7 @@ class MuseDatabase @JvmOverloads constructor(initialSourceFile: File? = null) {
         val condition = songKeywordCondition(query, args)
         return count(
             "SELECT COUNT(*) FROM songs s INNER JOIN playlist_songs ps ON s.id=ps.song_id " +
-                "WHERE ps.playlist_id=? AND s.available=1 AND s.deleted_at IS NULL AND $condition",
+                "WHERE ps.playlist_id=? AND s.deleted_at IS NULL AND $condition",
             args.toTypedArray(),
         )
     }
@@ -378,7 +378,7 @@ class MuseDatabase @JvmOverloads constructor(initialSourceFile: File? = null) {
     fun songById(songId: String?): Song? {
         if (songId == null) return null
         return songs(
-            "$SONG_SELECT WHERE s.id=? AND s.available=1 AND s.deleted_at IS NULL LIMIT 1",
+            "$SONG_SELECT WHERE s.id=? AND s.deleted_at IS NULL LIMIT 1",
             arrayOf(songId),
         ).firstOrNull()
     }
@@ -389,7 +389,7 @@ class MuseDatabase @JvmOverloads constructor(initialSourceFile: File? = null) {
         filenames.distinct().chunked(400).forEach { chunk ->
             val placeholders = List(chunk.size) { "?" }.joinToString(",")
             result += songs(
-                "$SONG_SELECT WHERE s.available=1 AND s.deleted_at IS NULL AND s.filename IN ($placeholders)",
+                "$SONG_SELECT WHERE s.deleted_at IS NULL AND s.filename IN ($placeholders)",
                 chunk.toTypedArray(),
             )
         }
@@ -398,7 +398,7 @@ class MuseDatabase @JvmOverloads constructor(initialSourceFile: File? = null) {
 
     /** Songs imported or downloaded by earlier app versions keep their directory in songs.path. */
     fun localPathSongs(): MutableList<Song> = songs(
-        "$SONG_SELECT WHERE s.available=1 AND s.deleted_at IS NULL " +
+        "$SONG_SELECT WHERE s.deleted_at IS NULL " +
             "AND s.path IS NOT NULL AND TRIM(s.path) != ''",
     )
 

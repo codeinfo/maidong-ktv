@@ -8,3 +8,10 @@
 - 下载完成后校验数据库完整性并自动合并安装。
 - 使用原子替换方式更新本地曲库，避免更新中断损坏现有数据库。
 - 完整数据库文件保留在本地，不直接提交到 Git 仓库。
+
+## 客户端配置
+
+- `gradle.properties` 的 `DATABASE_MANIFEST_URL` 指定清单地址，`DATABASE_MANIFEST_MIRRORS` 用逗号分隔填写同一份数据的镜像清单地址；分片按各自清单所在目录解析。
+- 需要登录才能下载大文件的镜像（如 Gitee）可通过 `DATABASE_TOKEN` 提供访问令牌；令牌只发送给 gitee.com。
+- 清单同时支持平铺分片（`size` + `chunks[].url`）和 gzip 分片（`original_size` + `files[].file`）两种格式。
+- 下载的分片保留在 `muse.db.parts` 目录，中断后再次启动会断点续传，校验通过后才替换正式曲库。

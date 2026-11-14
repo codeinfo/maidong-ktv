@@ -7333,13 +7333,13 @@ class MainActivity : AppCompatActivity() {
     private fun confirmResetDatabase() {
         AlertDialog.Builder(this)
             .setTitle("重置数据库")
-            .setMessage("将删除本地曲库数据库，然后从 Gitee 重新下载。不会保留备份，是否继续？")
+            .setMessage("将删除本地曲库数据库，然后重新下载曲库。不会保留备份，是否继续？")
             .setNegativeButton("取消", null)
-            .setPositiveButton("确认") { _, _ -> resetDatabaseFromGitee() }
+            .setPositiveButton("确认") { _, _ -> resetDatabase() }
             .create().showForTv()
     }
 
-    private fun resetDatabaseFromGitee() {
+    private fun resetDatabase() {
         showDatabaseLoading(true, "正在重置数据库...", null)
         io.execute {
             library.muse.close()
