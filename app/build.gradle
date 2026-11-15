@@ -23,16 +23,30 @@ android {
         // 可选：访问需要登录的镜像（如 Gitee 大文件）时使用的访问令牌。
         def downloadToken = project.findProperty("DATABASE_TOKEN") ?: ""
         buildConfigField "String", "DATABASE_TOKEN", "\"${downloadToken}\""
+        // 可选：歌曲媒体源基址（<base>/<filename>）。留空走内置签名接口；Android 4.4 上该接口
+        // 返回的 https 链接不可用，指向 HTTP 镜像即可恢复下载能力。
+        def mediaBaseUrl = project.findProperty("MEDIA_BASE_URL") ?: ""
+        buildConfigField "String", "MEDIA_BASE_URL", "\"${mediaBaseUrl}\""
 
     }
 
-    // 签名配置:使用已有的 ktv_keystore.jks
+    // 发布签名：从仓库根目录 keystore.properties 读取（该文件与 *.jks 均不入库）。
+    // 文件缺失时不创建 release 签名配置，release 产物为未签名包，不影响 debug 构建。
+    def keystorePropsFile = rootProject.file("keystore.properties")
+    def keystoreProps = new Properties()
+    if (keystorePropsFile.exists()) {
+        keystorePropsFile.withInputStream { keystoreProps.load(it) }
+    }
+    def hasReleaseSigning = keystorePropsFile.exists()
+
     signingConfigs {
-        release {
-            storeFile file("../../ktv_keystore.jks")
-            storePassword "123456"
-            keyAlias "ktv"
-            keyPassword "123456"
+        if (hasReleaseSigning) {
+            release {
+                storeFile rootProject.file(keystoreProps.getProperty("storeFile", "ktv_keystore.jks"))
+                storePassword keystoreProps.getProperty("storePassword", "")
+                keyAlias keystoreProps.getProperty("keyAlias", "ktv")
+                keyPassword keystoreProps.getProperty("keyPassword", "")
+            }
         }
     }
 
@@ -40,7 +54,9 @@ android {
         release {
             minifyEnabled true
             shrinkResources true
-            signingConfig signingConfigs.release
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {

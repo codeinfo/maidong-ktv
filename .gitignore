@@ -14,3 +14,8 @@ captures/
 *.xml.bak
 database_publish/muse.db
 database_publish/muse.db.reassembled
+# 签名与密钥：绝不入库
+keystore.properties
+*.jks
+*.keystore
+*.p12
