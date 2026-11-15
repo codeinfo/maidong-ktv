@@ -469,6 +469,9 @@ class MainActivity : AppCompatActivity() {
                         resumeInterruptedDownloads(interruptedDownloads)
                         if (currentSong == null && orderQueue!!.isEmpty()) startIdlePublicPlayback()
                         if (catalogRefreshPending) refreshCurrentCatalogPage()
+                        // 曲库就绪后再套一次 qa_open：首访要解压 20.5 MB 曲库，
+                        // 早先的 1.5s/7s 两次跳转会被这次首屏刷新覆盖回首页（QA 实测 singers/local/settings 停在首页）。
+                        maybeOpenQaPage()
                     })
                 } else {
                     showDatabaseLoading(true, "曲库初始化失败：${bootstrapError?.message.orEmpty()}", null)
