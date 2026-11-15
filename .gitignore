@@ -19,3 +19,6 @@ keystore.properties
 *.jks
 *.keystore
 *.p12
+
+# 验证流水线临时日志
+tools/_verify.log

@@ -85,7 +85,7 @@ docs/
 
 ---
 
-## 7. 索引（当前 10 份）
+## 7. 索引（当前 11 份）
 
 | 文档 | 目录 | 日期 | 状态 | 主题 |
 | --- | --- | --- | --- | --- |
@@ -97,6 +97,7 @@ docs/
 | 音源更新说明-i歌霸.md | features | 2026-11-15 | 现行 | iGeba 音源接入与三级路由 |
 | i歌霸登录与下载打通说明.md | features | 2026-11-15 | 现行 | 账号登录、会话与下载打通 |
 | 发布构建与签名.md | features | 2026-11-15 | 现行 | release 签名（新自签）、构建与验签、升级影响 |
+| 真机验证流水线.md | features | 2026-11-15 | 现行 | `tools/verify.ps1` 用法、判定规则、qa_open 覆盖 bug 修复 |
 | 安卓4.4-功能优化清单.md | plans | 2026-11-15 | 现行 | P0～P2 功能优化项与排期 |
 | README.md | 根 | 2026-11-15 | 现行 | 本规则与索引 |
 
@@ -107,6 +108,7 @@ docs/
 | 真机测试截图 | `assets/screenshots/真机测试/` | 31 png + 3 jpg（无 png 配对的 3 张单独保留） |
 | i歌霸验收截图 | `assets/screenshots/设备验证截图/` | 5 png |
 | 测试素材 | `assets/test-data/` | `测试歌曲.wav`、`matched_songs.json` |
+| 验证流水线产物 | `reports/verify/<时间戳>/` | `verify-report.md` + `shots/*.png`（每次运行一份，按时间戳归档） |
 
 ---
 
