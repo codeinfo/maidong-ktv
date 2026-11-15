@@ -78,9 +78,15 @@ internal object TvListNavigation {
             val targets = focusables(rowView)
             if (targets.isNotEmpty()) {
                 val clamped = column.coerceIn(0, targets.size - 1)
-                list.post { bestEffort(list, rowView, targets[clamped]) }
+                val target = targets[clamped]
+                list.post {
+                    if (!target.requestFocus()) {
+                        AppLog.w(TAG, "requestFocus 失败 row=$row col=$clamped target=${target.javaClass.simpleName}")
+                    }
+                }
                 return true
             }
+            AppLog.w(TAG, "行内无可聚焦项 row=$row type=${rowView.javaClass.simpleName}")
         }
         // 行还没被填充（刚 setSelection 之后）：等下一帧再取
         list.post {
@@ -92,7 +98,9 @@ internal object TvListNavigation {
 
     private fun bestEffort(list: ListView, rowView: View, target: View) {
         if (target.isAttachedToWindow && target.visibility == View.VISIBLE) {
-            target.requestFocus()
+            if (!target.requestFocus()) {
+                focusables(rowView).firstOrNull()?.requestFocus()
+            }
         } else if (!rowView.hasFocus()) {
             focusables(rowView).firstOrNull()?.requestFocus()
         }
@@ -130,10 +138,11 @@ internal object TvListNavigation {
     private fun focusables(row: View): List<View> {
         val result = mutableListOf<View>()
         fun collect(view: View) {
+            // 歌星格子本身是可点击的 LinearLayout（子控件 ImageView/TextView 不可点），
+            // 只收集叶子会得到 0 个目标，必须把「自身可点击的容器」也算一个焦点位。
+            if (view.isClickable && view.isEnabled && view.visibility == View.VISIBLE) result += view
             if (view is ViewGroup) {
                 repeat(view.childCount) { collect(view.getChildAt(it)) }
-            } else if (view.isClickable && view.isEnabled && view.visibility == View.VISIBLE) {
-                result += view
             }
         }
         collect(row)

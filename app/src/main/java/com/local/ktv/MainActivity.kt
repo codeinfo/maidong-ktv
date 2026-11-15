@@ -129,6 +129,15 @@ import kotlin.plus
 import kotlin.toString
 
 class MainActivity : AppCompatActivity() {
+
+    /**
+     * 按屏幕等比缩放界面（基准 1280×720 dp），1080p/4K TV 上排版不跑偏。
+     * 必须在 setContentView 之前改 Activity 自己的 Resources，16 行布局才按新 density 换算。
+     */
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(newBase)
+    }
+
     private val main = Handler(Looper.getMainLooper())
     private val keyboardSearchRunnable = Runnable { performSearch() }
     private val io: ExecutorService = Executors.newFixedThreadPool(4)
@@ -351,6 +360,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        TvUiScale.applyTo(this)
         getWindow().getDecorView().setSystemUiVisibility(
             (View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
                     or View.SYSTEM_UI_FLAG_FULLSCREEN
@@ -1643,6 +1653,12 @@ class MainActivity : AppCompatActivity() {
                 )
                 addSettingsItem(
                     content,
+                    "歌手头像缓存",
+                    SingerPortraitStore.stats().let { (count, bytes) -> count.toString() + " 张 / " + formatBytes(bytes) },
+                    View.OnClickListener { v: View? -> confirmCleanPortraitCache { renderSettingsContent(content, 9) } }
+                )
+                addSettingsItem(
+                    content,
                     "本地镜像",
                     BuildConfig.MEDIA_BASE_URL.trim().ifEmpty { "未配置（gradle.properties 的 MEDIA_BASE_URL）" },
                     null
@@ -1887,7 +1903,11 @@ class MainActivity : AppCompatActivity() {
         logo.setImageResource(R.drawable.ktv_logo)
         logo.setScaleType(ImageView.ScaleType.FIT_CENTER)
         header.addView(logo, LinearLayout.LayoutParams(dp(42), dp(42)))
-        val song = label(currentAndNextText(), 18, Color.WHITE)
+        val song = LoopingStatusTextView(this)
+        song.setText(currentAndNextText())
+        song.setTextSize(18f)
+        song.setTextColor(Color.WHITE)
+        song.setPadding(dp(8), 0, dp(8), 0)
         fullScreenSongInfo = song
         header.addView(song, LinearLayout.LayoutParams(0, dp(48), 1f))
         val back = label("返回", 15, Color.WHITE)
@@ -2333,9 +2353,24 @@ class MainActivity : AppCompatActivity() {
     private fun showAlignedTuningDialog(): Boolean {
         val root = getLayoutInflater().inflate(R.layout.dialog_tuning, null)
         val toneValue = root.findViewById<TextView>(R.id.text_tone_counter)
-        val micValue = root.findViewById<TextView>(R.id.text_mic_counter)
+        val dialMic = root.findViewById<CircularVolumeView>(R.id.dial_mic)
+        val dialMusic = root.findViewById<CircularVolumeView>(R.id.dial_music)
         toneValue.setText(tone.toString())
-        micValue.setText(micVolume.toString())
+        dialMic.label = "麦克风"
+        dialMic.setValue(micVolume)
+        dialMic.onValueChanged = { value: Int ->
+            micVolume = value
+            AppLog.i("Tuning", "麦克风音量=$value")
+            saveState()
+        }
+        dialMusic.label = "音乐"
+        dialMusic.setValue(musicVolume)
+        dialMusic.onValueChanged = { value: Int ->
+            musicVolume = value
+            AppLog.i("Tuning", "音乐音量=$value")
+            applyPlaybackMode()
+            saveState()
+        }
 
         val dialog = AlertDialog.Builder(this).setView(root).create()
         root.findViewById<View?>(R.id.btn_tuning_close)
@@ -2354,18 +2389,6 @@ class MainActivity : AppCompatActivity() {
                 applyPlaybackMode()
                 saveState()
             })
-        root.findViewById<View?>(R.id.btn_mic_down)
-            .setOnClickListener(View.OnClickListener { v: View? ->
-                micVolume = max(0, micVolume - 5)
-                micValue.setText(micVolume.toString())
-                saveState()
-            })
-        root.findViewById<View?>(R.id.btn_mic_up)
-            .setOnClickListener(View.OnClickListener { v: View? ->
-                micVolume = min(100, micVolume + 5)
-                micValue.setText(micVolume.toString())
-                saveState()
-            })
         bindAtmospherePreset(root, R.id.btn_preset_pop, "流行")
         bindAtmospherePreset(root, R.id.btn_preset_lyric, "抒情")
         bindAtmospherePreset(root, R.id.btn_preset_rock, "摇滚")
@@ -2377,7 +2400,7 @@ class MainActivity : AppCompatActivity() {
                 attributes = attributes.apply { dimAmount = 0.72f }
                 addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
             }
-            root.findViewById<View>(R.id.btn_tone_down).requestFocus()
+            root.findViewById<View>(R.id.dial_mic).requestFocus()
         })
         return true
     }
@@ -6981,20 +7004,48 @@ class MainActivity : AppCompatActivity() {
      * 加载歌手列表
      */
     /** 仅 debug 包：`am start ... --es qa_open singers` 直接进歌星页，用于无触摸输入设备上的验证。 */
+    /**
+     * 仅 debug 包：`--es qa_open status` 用来验证 LoopingStatusTextView 的循环滚动。
+     * 进入全屏后把真实的「当前/下一首」文案重复三遍，制造溢出，设备上两帧截图即可看出位移。
+     */
+    private fun verifyLoopingStatus() {
+        showFullScreenPlayer()
+        main.postDelayed({
+            val info = fullScreenSongInfo ?: return@postDelayed
+            info.text = (currentAndNextText() + "    ").repeat(8)
+            AppLog.i("LoopText", "已注入 8 倍长文本，用于验证循环滚动")
+        }, 2000L)
+    }
+
     private fun maybeOpenQaPage() {
         if (!BuildConfig.DEBUG) return
         val target = intent?.getStringExtra("qa_open")?.trim().orEmpty()
         if (target.isEmpty()) return
-        // 放到启动流程末尾再打开，否则会被首屏渲染/曲库回调覆盖回首页
-        main.postDelayed({
-            when (target) {
-                "singers" -> loadSingers()
-                "local" -> showLocalPage()
-                "guess" -> showGuessPage()
-                else -> AppLog.w("KeyTrace", "未知 qa_open=$target")
-            }
-            AppLog.i("KeyTrace", "qa_open 已打开 $target")
-        }, 1500L)
+        // 放到启动流程末尾再打开，否则会被首屏渲染/曲库回调覆盖回首页；晚一点再补一次
+        listOf(1500L, 7000L).forEach { delay ->
+            main.postDelayed({
+                when (target) {
+                    "singers" -> loadSingers()
+                    "local" -> showLocalPage()
+                    "guess" -> showGuessPage()
+                    "tuning" -> showAudioControlDialog()
+                    "fullscreen" -> showFullScreenPlayer()
+                    "status" -> verifyLoopingStatus()
+                    "settings" -> showSettings()
+                    "settingsdata" -> {
+                        showSettings()
+                        showSettingsSection(1, false)
+                    }
+                    "portraitclear" -> {
+                        showSettings()
+                        showSettingsSection(1, false)
+                        confirmCleanPortraitCache { showSettingsSection(1, false) }
+                    }
+                    else -> AppLog.w("KeyTrace", "未知 qa_open=$target")
+                }
+                AppLog.i("KeyTrace", "qa_open 已打开 $target (delay=$delay)")
+            }, delay)
+        }
     }
 
     private fun loadSingers() {
@@ -7321,6 +7372,12 @@ class MainActivity : AppCompatActivity() {
                 SettingsEntry(R.drawable.ott_ic_data_reset, "自动删歌", "当剩余存储空间低于预留空间时，自动删除冷门歌曲", action = { autoDeleteSongs = !autoDeleteSongs; saveState() }, checked = autoDeleteSongs),
                 SettingsEntry(R.drawable.ott_ic_data_upgrade, "重置数据库", "删除本地数据库并重新下载", "重置") { confirmResetDatabase() },
                 SettingsEntry(R.drawable.ott_ic_setting_storage_space, "硬盘读写权限") { toast(storageStatusText()) },
+                SettingsEntry(
+                    R.drawable.ott_ic_data_setting,
+                    "歌手头像缓存",
+                    "已缓存 ${SingerPortraitStore.stats().first} 张 / ${formatBytes(SingerPortraitStore.stats().second)}，清理后进歌星页会重新联网拉取",
+                    "清理"
+                ) { confirmCleanPortraitCache { showSettingsSection(1, false) } },
             )
             2 -> listOf(
                 SettingsEntry(R.drawable.ott_ic_pub_play, "公播") { showPubPlayDialog() },
@@ -8631,6 +8688,41 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton("取消", null)
             .create()
             .show()
+    }
+
+    /**
+     * 清理歌手头像库：只删 `/sdcard/MaidongKTV/images/singers/<编号>.img`，
+     * 下次进歌星页会按曲库 image_url 重新拉，不占额外空间。
+     */
+    private fun confirmCleanPortraitCache(onDone: (() -> Unit)? = null) {
+        val (count, bytes) = SingerPortraitStore.stats()
+        if (count == 0) {
+            toast("没有可清理的头像缓存")
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("清理歌手头像")
+            .setMessage(
+                "将删除已缓存的 " + count + " 张头像（" + formatBytes(bytes) + "）。\n" +
+                    "清理后进歌星页会重新联网拉取，首次显示会慢一点。"
+            )
+            .setPositiveButton("清理") { _: DialogInterface?, _: Int ->
+                val (c, b) = SingerPortraitStore.clear()
+                // 内存里还有一份 LRU，一并清掉，避免界面上「清了还显示」的错觉
+                SingerAvatarLoader.clearMemory()
+                AppLog.i("SingerPortrait", "头像库已清理 $c 张 / $b 字节")
+                toast("已清理 " + c + " 张头像（" + formatBytes(b) + "）")
+                onDone?.invoke()
+            }
+            .setNegativeButton("取消", null)
+            .create()
+            .show()
+    }
+
+    private fun formatBytes(bytes: Long): String = when {
+        bytes >= 1024L * 1024L -> String.format("%.1f MB", bytes / 1024.0 / 1024.0)
+        bytes >= 1024L -> String.format("%.0f KB", bytes / 1024.0)
+        else -> bytes.toString() + " B"
     }
 
     private fun toast(text: String?) {

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="470dp"
-    android:layout_height="340dp"
+    android:layout_width="680dp"
+    android:layout_height="392dp"
     android:background="@drawable/bg_tuning_dialog"
     android:orientation="vertical"
     android:paddingStart="28dp"
@@ -61,6 +61,21 @@
             </LinearLayout>
         </LinearLayout>
 
+                <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_marginEnd="12dp"
+            android:background="@drawable/bg_tuning_counter"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <com.local.ktv.CircularVolumeView
+                android:id="@+id/dial_mic"
+                android:layout_width="124dp"
+                android:layout_height="124dp" />
+        </LinearLayout>
+
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="match_parent"
@@ -69,18 +84,10 @@
             android:gravity="center"
             android:orientation="vertical">
 
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="麦克风" android:textColor="#FFFFFFFF" android:textSize="17sp" />
-
-            <LinearLayout android:layout_width="match_parent" android:layout_height="54dp"
-                android:gravity="center" android:orientation="horizontal">
-                <TextView android:id="@+id/btn_mic_down" android:layout_width="48dp" android:layout_height="48dp"
-                    android:gravity="center" android:text="−" android:textColor="#FFFFFFFF" android:textSize="34sp" />
-                <TextView android:id="@+id/text_mic_counter" android:layout_width="56dp" android:layout_height="48dp"
-                    android:gravity="center" android:text="50" android:textColor="#FFFFFFFF" android:textSize="20sp" />
-                <TextView android:id="@+id/btn_mic_up" android:layout_width="48dp" android:layout_height="48dp"
-                    android:gravity="center" android:text="+" android:textColor="#FFFFFFFF" android:textSize="30sp" />
-            </LinearLayout>
+            <com.local.ktv.CircularVolumeView
+                android:id="@+id/dial_music"
+                android:layout_width="124dp"
+                android:layout_height="124dp" />
         </LinearLayout>
     </LinearLayout>
 

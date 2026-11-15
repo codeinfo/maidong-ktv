@@ -35,6 +35,11 @@ internal object SingerAvatarLoader {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
     }
 
+    /** 清空内存缓存（设置页清头像库时一并调用，避免「清了还显示」）。 */
+    fun clearMemory() {
+        memory.evictAll()
+    }
+
     /** @param targetSizePx 期望边长（像素），按 view 尺寸传入即可。 */
     fun load(number: String?, url: String?, target: ImageView, fallback: Drawable, targetSizePx: Int = 128) {
         val key = number?.takeIf { it.isNotBlank() } ?: url?.takeIf { it.isNotBlank() } ?: return

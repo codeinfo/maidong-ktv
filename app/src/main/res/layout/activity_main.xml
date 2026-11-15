@@ -285,13 +285,12 @@
                     android:layout_marginBottom="6dp"
                     android:background="@drawable/bg_left_header">
 
-                    <TextView
+                    <com.local.ktv.LoopingStatusTextView
                         android:id="@+id/text_current_song_tip"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:singleLine="true"
-                        android:ellipsize="end"
                         android:text="当前: 未知  下首: 未知"
                         android:textColor="#FFE0E0FF"
                         android:textSize="12sp" />
