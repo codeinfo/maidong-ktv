@@ -8,6 +8,8 @@
 
 <p align="center">遥控器操作 · 歌曲检索 · 点播队列 · 下载管理 · 稳定播放</p>
 
+<p align="center"><b>📦 当前主线：Android 4.4（API 19）打包分支 <code>master</code></b></p>
+
 ## ⚠️ 严正声明 (Important Notice)
 
 本软件是**完全免费且公开源码**的个人学习与技术交流项目。
@@ -15,6 +17,34 @@
 - **【禁止任何形式的营利性使用】**：本软件（包括源码和编译后的 APK）严禁任何商家或个人进行打包售卖、硬件预装、收费技术支持或商业运营。
 - **【侵权必究】**：如果您是付费购买的本软件，说明您已被骗，请立即向平台举报商家并退款。
 - 完整授权条款请参见项目根目录下的 [LICENSE](./LICENSE) 文件。
+
+## 📦 Android 4.4 打包说明
+
+本仓库当前主线是 **Android 4.4（API 19）** 构建线，`master` 与 `android-4.4.4` 指向同一提交，产物面向车载机、电视盒等老设备。
+
+| 项 | 值 |
+| --- | --- |
+| applicationId | `com.local.ktv`（debug 变体加 `.qa` 后缀，可与正式包共存） |
+| minSdk / targetSdk / compileSdk | 19 / 25 / 35 |
+| versionName / versionCode | 1.1.0 / 2 |
+| 原生库 | 仅 `armeabi-v7a`（依赖 `app/libs` 内的 IJK 运行时，不支持 arm64/x86） |
+| 播放栈 | IJK（`KtvVideoView`），IJK 初始化失败时回落平台 MediaPlayer |
+| 工具链 | JDK 17、Gradle 8.13（wrapper）、AGP 8.2.2、Kotlin 1.9.22 |
+
+打包命令（在仓库根目录执行）：
+
+```bash
+./gradlew assembleRelease   # 正式包，需根目录有 keystore.properties 与 ktv_keystore.jks
+./gradlew assembleDebug     # 调试包，无需签名，包名带 .qa 后缀
+```
+
+产物位于 `app/build/outputs/apk/release/app-release.apk`（约 29 MB，v1 + v2 签名）。
+
+签名配置：`app/build.gradle` 从仓库根目录的 `keystore.properties` 读取 `storeFile` / `storePassword` / `keyAlias` / `keyPassword`。该文件与 `*.jks` 已列入 `.gitignore`、不入库；缺少时只产未签名包，不影响 debug 构建。细节见 [docs/features/发布构建与签名.md](./docs/features/发布构建与签名.md)。
+
+注意：更换签名后，设备上装有旧签名版本的需先卸载再安装。
+
+> 上游 2.1.12 线（`gitee-master` / `gitee-igeba-media`）使用 ExoPlayer(media3) + NDK FFmpeg，与本线为**无关历史**，仅作对照，不合并。
 
 ## 核心功能
 
