@@ -20,7 +20,10 @@ object AppPaths {
     val appsDir = File(root, "apps")
     val backupDir = File(root, "backup")
     val databaseDir = File(root, "database")
+    /** 旧 Muse 曲库（1.0/1.1 沿用），曲库切换到 i歌霸后不再写入，仅保留以兼容历史文件。 */
     val databaseFile = File(databaseDir, "muse.db")
+    /** i歌霸曲库：首次启动时从 assets 解压到这里，之后只读查询。 */
+    val igebaCatalogFile = File(databaseDir, "igeba_catalog.db")
     val videoDir = File(VIDEO_PATH)
     val cloudSongsDir = File(videoDir, "cloud-song")
 

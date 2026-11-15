@@ -5,6 +5,7 @@ import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.FilterInputStream
+import java.io.IOException
 import java.io.InputStream
 import java.io.SequenceInputStream
 import java.net.HttpURLConnection
@@ -28,11 +29,11 @@ import java.util.zip.GZIPInputStream
  * and every part is retried against the other manifest mirrors.
  */
 object DatabaseBootstrapper {
-    private const val DOWNLOAD_ATTEMPTS = 2
-    private const val CHUNK_ATTEMPTS = 2
-    private const val DOWNLOAD_THREADS = 4
-    private const val CONNECT_TIMEOUT_MS = 15_000
-    private const val READ_TIMEOUT_MS = 30_000
+    private const val DOWNLOAD_ATTEMPTS = 3
+    private const val CHUNK_ATTEMPTS = 3
+    private const val DOWNLOAD_THREADS = 6
+    private const val CONNECT_TIMEOUT_MS = 10_000
+    private const val READ_TIMEOUT_MS = 15_000
     private const val MIN_FREE_MARGIN = 64L * 1024L * 1024L
 
     val manifestUrl: String get() = BuildConfig.DATABASE_MANIFEST_URL
@@ -61,6 +62,7 @@ object DatabaseBootstrapper {
     }
 
     private fun downloadOnce(onProgress: (Int) -> Unit): File {
+        TlsCompat.install()
         val source = fetchManifest()
         val record = parseManifest(source)
         val target = MuseDatabase.defaultDbFile()
@@ -70,7 +72,7 @@ object DatabaseBootstrapper {
         val partsDir = File(databaseDir, "${target.name}.parts")
         temporaryDb.delete()
         check(partsDir.exists() || partsDir.mkdirs()) { "无法创建曲库临时目录" }
-        partsDir.listFiles()?.forEach { if (it.name.endsWith(".tmp")) it.delete() }
+        // 保留 *.tmp 暂存文件：它们是分片未完成的下载进度，下次运行可断点续传。
         checkSpace(databaseDir, record.requiredSpace)
 
         try {
@@ -191,11 +193,13 @@ object DatabaseBootstrapper {
         val mirrors = listOf(source.manifestUrl) + manifestUrls.filter { it != source.manifestUrl }
         val total = record.downloadSize.coerceAtLeast(1L)
         val done = AtomicLong(0L)
+        val active = java.util.concurrent.ConcurrentHashMap<Int, Long>()
         val lastReported = AtomicInteger(-1)
         val next = AtomicInteger(0)
         val preferred = AtomicInteger(0)
         val failure = AtomicReference<Throwable?>(null)
-        val report = { bytes: Long ->
+        val report = {
+            val bytes = done.get() + active.values.sumOf { it }
             val percent = (bytes * 78L / total).toInt().coerceIn(0, 78)
             while (true) {
                 val previous = lastReported.get()
@@ -203,7 +207,7 @@ object DatabaseBootstrapper {
             }
             if (lastReported.get() == percent) onProgress(percent)
         }
-        val worker = Runnable {
+        fun worker(slot: Int) = Runnable {
             while (failure.get() == null) {
                 val index = next.getAndIncrement()
                 if (index >= chunks.size) return@Runnable
@@ -211,34 +215,46 @@ object DatabaseBootstrapper {
                 try {
                     if (!isPartValid(part, chunks[index])) {
                         part.delete()
-                        fetchChunk(chunks[index], mirrors, preferred, part)
+                        fetchChunk(chunks[index], mirrors, preferred, part) { bytes ->
+                            active[slot] = bytes
+                            report()
+                        }
                     }
-                    report(done.addAndGet(part.length()))
+                    active.remove(slot)
+                    done.addAndGet(part.length())
+                    report()
                 } catch (error: Throwable) {
+                    active.remove(slot)
                     failure.compareAndSet(null, error)
                     return@Runnable
                 }
             }
         }
-        val threads = List(minOf(DOWNLOAD_THREADS, chunks.size)) { Thread(worker, "catalog-part-$it") }
+        val threads = List(minOf(DOWNLOAD_THREADS, chunks.size)) { Thread(worker(it), "catalog-part-$it") }
         threads.forEach { it.isDaemon = true }
         threads.forEach { it.start() }
         threads.forEach { it.join() }
         failure.get()?.let { throw it }
     }
 
-    private fun fetchChunk(chunk: Chunk, mirrors: List<String>, preferred: AtomicInteger, part: File) {
+    private fun fetchChunk(
+        chunk: Chunk,
+        mirrors: List<String>,
+        preferred: AtomicInteger,
+        part: File,
+        onBytes: (Long) -> Unit,
+    ) {
         val urls = mirrors.map { resolveUrl(it, chunk.path) }.distinct()
         if (urls.isEmpty()) error("曲库分片没有可用的下载地址：${chunk.path}")
         val start = preferred.get().coerceIn(0, urls.lastIndex)
         var lastError: Throwable? = null
+        val staging = File(part.parentFile, "${part.name}.tmp")
+        if (staging.isFile) onBytes(staging.length())
         for (offset in urls.indices) {
             val mirror = (start + offset) % urls.size
             repeat(CHUNK_ATTEMPTS) { attempt ->
-                val staging = File(part.parentFile, "${part.name}.${Thread.currentThread().id}.tmp")
-                staging.delete()
                 val result = runCatching {
-                    downloadTo(urls[mirror], staging)
+                    downloadTo(urls[mirror], staging, chunk.size, onBytes)
                     verifyPart(staging, chunk)
                 }
                 if (result.isSuccess) {
@@ -246,8 +262,10 @@ object DatabaseBootstrapper {
                     preferred.set(mirror)
                     return
                 }
-                lastError = result.exceptionOrNull()
-                staging.delete()
+                val error = result.exceptionOrNull()
+                lastError = error
+                // 校验/大小不一致说明暂存内容不可信，必须丢弃重下；网络中断则保留进度下次续传。
+                if (error !is IOException) staging.delete()
                 if (attempt + 1 < CHUNK_ATTEMPTS) Thread.sleep(500L * (attempt + 1))
             }
         }
@@ -316,14 +334,40 @@ object DatabaseBootstrapper {
     private fun partFile(partsDir: File, index: Int): File =
         File(partsDir, "part-${index.toString().padStart(5, '0')}")
 
-    private fun downloadTo(url: String, target: File) {
+    /** 下载单个分片到暂存文件；暂存文件已有数据时用 Range 续传，服务器不支持续传则重新开始。 */
+    private fun downloadTo(url: String, target: File, expectedSize: Long, onBytes: (Long) -> Unit) {
+        var have = if (target.isFile) target.length() else 0L
+        if (expectedSize >= 0L && (have > expectedSize || have == expectedSize)) {
+            if (have > expectedSize) {
+                target.delete()
+                have = 0L
+            } else {
+                return
+            }
+        }
         val connection = openConnection(url)
         try {
+            if (have > 0L) connection.setRequestProperty("Range", "bytes=$have-")
             val code = connection.responseCode
-            if (code !in 200..299) throw HttpStatusException(code, url)
+            if (code == HttpURLConnection.HTTP_OK && have > 0L) {
+                // 服务器忽略了 Range，只能整片重下
+                target.delete()
+                have = 0L
+            } else if (code != HttpURLConnection.HTTP_PARTIAL && code !in 200..299) {
+                throw HttpStatusException(code, url)
+            }
+            onBytes(have)
             connection.inputStream.buffered(256 * 1024).use { input ->
-                target.outputStream().buffered(256 * 1024).use { output ->
-                    input.copyTo(output, 256 * 1024)
+                FileOutputStream(target, have > 0L).buffered(256 * 1024).use { output ->
+                    val buffer = ByteArray(256 * 1024)
+                    var written = have
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read <= 0) break
+                        output.write(buffer, 0, read)
+                        written += read
+                        onBytes(written)
+                    }
                 }
             }
         } finally {

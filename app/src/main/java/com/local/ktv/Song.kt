@@ -35,6 +35,12 @@ class Song {
     @JvmField var pAccomp: String? = null
     @JvmField var oModeChannels: String? = null
 
+    /** i歌霸歌曲编号（8 位），来自内置索引匹配或历史数据；为空表示该歌未接入 i歌霸音源。 */
+    @JvmField var sourceSongNumber: String? = null
+
+    /** 最近一次取地址成功的音源来源，见 SongSourceRouter.Source.label。 */
+    @JvmField var sourceName: String? = null
+
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", id)
         put("title", title)
@@ -65,6 +71,8 @@ class Song {
         pOrigin?.let { put("pOrigin", it) }
         pAccomp?.let { put("pAccomp", it) }
         oModeChannels?.let { put("oModeChannels", it) }
+        sourceSongNumber?.let { put("sourceSongNumber", it) }
+        sourceName?.let { put("sourceName", it) }
     }
 
     fun displayTitle(): String = "${title.orEmpty()}  -  ${singer.orEmpty()}"
@@ -75,10 +83,8 @@ class Song {
 
     fun getDownloadUrl(): String {
         downloadUrl?.takeIf(String::isNotEmpty)?.let { return it }
-        SongApiClient.getSongDownloadUrl(filename?.substringBeforeLast('.') ?: id)?.takeIf(String::isNotEmpty)?.let {
-            downloadUrl = it
-            return it
-        }
+        // 统一走音源路由：本地镜像 → i歌霸 → 内置接口
+        SongSourceRouter.resolve(this)?.let { return it.url }
         return filename?.takeIf(String::isNotEmpty)
             ?.let { "https://pub.cdn.cherryonline.cn/video/cloud-song/$it" }
             .orEmpty()
@@ -163,6 +169,9 @@ class Song {
             pOrigin = json.optNullableString("pOrigin")
             pAccomp = json.optNullableString("pAccomp")
             oModeChannels = json.optNullableString("oModeChannels")
+            sourceSongNumber = json.optNullableString("sourceSongNumber")
+                ?: json.optNullableString("SongNumber")
+            sourceName = json.optNullableString("sourceName")
         }
 
         private fun JSONObject.optNullableString(key: String): String? =

@@ -62,6 +62,18 @@ class SingerGridAdapter(
                 setImageDrawable(circularAvatar(defaultAvatar(type, name)))
             }
             addView(avatar, LinearLayout.LayoutParams(dp(88), dp(88)).apply { topMargin = dp(21) })
+            // 曲库自带歌手头像（image_url）：本地库优先，缺失时按需在线拉一张，失败保留占位图
+            val number = singer.getOrNull(0)
+            val portraitUrl = singer.getOrNull(5)
+            if (!number.isNullOrBlank() && !portraitUrl.isNullOrBlank()) {
+                SingerAvatarLoader.load(
+                    number,
+                    portraitUrl,
+                    avatar,
+                    circularAvatar(defaultAvatar(type, name)),
+                    dp(96),
+                )
+            }
 
             addView(TextView(context).apply {
                 text = name

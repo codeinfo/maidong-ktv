@@ -26,7 +26,11 @@ class QuickSearchAdapter(
     private val onSongMore: (Song) -> Unit,
 ) : BaseAdapter() {
     private val density = context.resources.displayMetrics.density
-    private val songRows = ceil(songs.size / 2.0).toInt()
+    // 窄屏（手机横屏 640dp 宽）下 2 列/4 头像会把歌名挤成一个字，按宽度自适应
+    private val narrow = context.resources.configuration.screenWidthDp < 800
+    private val songColumns = if (narrow) 1 else 2
+    private val singerColumns = if (narrow) 2 else 4
+    private val songRows = ceil(songs.size / songColumns.toDouble()).toInt()
 
     override fun getCount(): Int = (if (singers.isEmpty()) 0 else 1) + songRows
     override fun getItem(position: Int): Any = position
@@ -37,8 +41,8 @@ class QuickSearchAdapter(
         val songRow = position - if (singers.isEmpty()) 0 else 1
         return LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
-            repeat(2) { column ->
-                val song = songs.getOrNull(songRow * 2 + column)
+            repeat(songColumns) { column ->
+                val song = songs.getOrNull(songRow * songColumns + column)
                 addView(
                     song?.let(::createSongCell) ?: View(context),
                     LinearLayout.LayoutParams(0, dp(60), 1f).apply {
@@ -52,10 +56,10 @@ class QuickSearchAdapter(
     private fun createSingerRow(): View = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER
-        singers.take(4).forEach { singer ->
+        singers.take(singerColumns).forEach { singer ->
             addView(createSingerTile(singer), LinearLayout.LayoutParams(0, dp(132), 1f))
         }
-        repeat((4 - singers.size.coerceAtMost(4)).coerceAtLeast(0)) {
+        repeat((singerColumns - singers.size.coerceAtMost(singerColumns)).coerceAtLeast(0)) {
             addView(View(context), LinearLayout.LayoutParams(0, dp(132), 1f))
         }
     }
@@ -97,6 +101,7 @@ class QuickSearchAdapter(
         addView(LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
+            minimumWidth = dp(60)
             addView(TextView(context).apply {
                 text = song.title
                 textSize = 16f
@@ -117,7 +122,7 @@ class QuickSearchAdapter(
             setPadding(dp(8), dp(8), dp(8), dp(8))
             isClickable = false
             isFocusable = false
-        }, LinearLayout.LayoutParams(dp(40), dp(40)))
+        }, LinearLayout.LayoutParams(dp(32), dp(32)))
         installPress(this)
         setOnClickListener { onSongClick(song) }
         setOnLongClickListener { onSongMore(song); true }

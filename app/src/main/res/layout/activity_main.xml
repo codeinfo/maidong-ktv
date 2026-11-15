@@ -22,15 +22,15 @@
         android:layout_gravity="top"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingStart="28dp"
-        android:paddingEnd="18dp"
+        android:paddingStart="18dp"
+        android:paddingEnd="12dp"
         android:background="@drawable/bg_top_bar">
 
         <!-- 左侧 logo -->
         <ImageView
             android:id="@+id/text_logo"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
             android:contentDescription="麦动"
             android:scaleType="fitCenter"
             android:src="@drawable/ktv_logo" />
@@ -38,12 +38,12 @@
         <TextView
             android:id="@+id/top_brand_name"
             android:layout_width="wrap_content"
-            android:layout_height="44dp"
-            android:layout_marginStart="8dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="6dp"
             android:gravity="center_vertical"
             android:text="麦动"
             android:textColor="#FFFFFFFF"
-            android:textSize="22sp"
+            android:textSize="18sp"
             android:textStyle="bold" />
 
         <!-- 搜索按钮 -->
@@ -51,11 +51,11 @@
             android:id="@+id/btn_top_search"
             android:layout_width="wrap_content"
             android:layout_height="32dp"
-            android:layout_marginStart="10dp"
+            android:layout_marginStart="8dp"
             android:background="@drawable/bg_btn_top_search"
             android:gravity="center_vertical"
-            android:paddingStart="12dp"
-            android:paddingEnd="16dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="12dp"
             android:text="⌕  搜索"
             android:textColor="#FFFFFFFF"
             android:textSize="13sp" />
@@ -74,8 +74,8 @@
             android:background="@drawable/bg_btn_top_action"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="10dp"
-            android:paddingEnd="12dp">
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
 
             <TextView
                 android:id="@+id/text_top_order_label"
@@ -104,11 +104,11 @@
             android:id="@+id/btn_top_vocal"
             android:layout_width="wrap_content"
             android:layout_height="32dp"
-            android:layout_marginStart="6dp"
+            android:layout_marginStart="4dp"
             android:background="@drawable/bg_btn_top_action"
             android:gravity="center_vertical"
-            android:paddingStart="10dp"
-            android:paddingEnd="12dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
             app:drawableStartCompat="@drawable/ott_ic_ctrl_music_accomp"
             android:drawablePadding="5dp"
             android:text="伴唱"
@@ -119,11 +119,11 @@
             android:id="@+id/btn_top_next"
             android:layout_width="wrap_content"
             android:layout_height="32dp"
-            android:layout_marginStart="6dp"
+            android:layout_marginStart="4dp"
             android:background="@drawable/bg_btn_top_action"
             android:gravity="center_vertical"
-            android:paddingStart="10dp"
-            android:paddingEnd="12dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
             app:drawableStartCompat="@drawable/ott_ic_ctrl_switch_song"
             android:drawablePadding="5dp"
             android:text="切歌"
@@ -134,11 +134,11 @@
             android:id="@+id/btn_top_pause"
             android:layout_width="wrap_content"
             android:layout_height="32dp"
-            android:layout_marginStart="6dp"
+            android:layout_marginStart="4dp"
             android:background="@drawable/bg_btn_top_action"
             android:gravity="center_vertical"
-            android:paddingStart="10dp"
-            android:paddingEnd="12dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
             app:drawableStartCompat="@drawable/ott_ic_ctrl_pause"
             android:drawablePadding="5dp"
             android:text="暂停"
@@ -149,11 +149,11 @@
             android:id="@+id/btn_top_replay"
             android:layout_width="wrap_content"
             android:layout_height="32dp"
-            android:layout_marginStart="6dp"
+            android:layout_marginStart="4dp"
             android:background="@drawable/bg_btn_top_action"
             android:gravity="center_vertical"
-            android:paddingStart="10dp"
-            android:paddingEnd="12dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
             app:drawableStartCompat="@drawable/ott_ic_ctrl_replay"
             android:drawablePadding="5dp"
             android:text="重唱"
@@ -164,11 +164,11 @@
             android:id="@+id/btn_top_tone"
             android:layout_width="wrap_content"
             android:layout_height="32dp"
-            android:layout_marginStart="6dp"
+            android:layout_marginStart="4dp"
             android:background="@drawable/bg_btn_top_action"
             android:gravity="center_vertical"
-            android:paddingStart="10dp"
-            android:paddingEnd="12dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
             app:drawableStartCompat="@drawable/ott_ic_ctrl_volume"
             android:drawablePadding="5dp"
             android:text="调音"
@@ -176,11 +176,11 @@
             android:textSize="13sp" />
 
         <ImageView
-            android:layout_width="30dp"
+            android:layout_width="24dp"
             android:layout_height="32dp"
-            android:layout_marginStart="6dp"
+            android:layout_marginStart="4dp"
             android:contentDescription="WiFi"
-            android:padding="6dp"
+            android:padding="4dp"
             android:scaleType="centerInside"
             app:srcCompat="@drawable/ott_ic_wifi" />
     </LinearLayout>
@@ -258,18 +258,19 @@
             android:layout_height="match_parent"
             android:orientation="horizontal"
             android:paddingStart="45dp"
-            android:paddingTop="39dp"
+            android:paddingTop="16dp"
             android:paddingEnd="45dp"
-            android:paddingBottom="31dp"
+            android:paddingBottom="12dp"
             android:visibility="gone">
 
             <!-- ===== 左列: 播放器 + 键盘 ===== -->
             <LinearLayout
                 android:id="@+id/left_column"
-                android:layout_width="370dp"
+                android:layout_width="0dp"
                 android:layout_height="match_parent"
+                android:layout_weight="0.60"
                 android:orientation="vertical"
-                android:layout_marginEnd="20dp">
+                android:layout_marginEnd="16dp">
 
                 <!-- 顶部提示: 当前 / 下一首 -->
                 <LinearLayout
@@ -300,7 +301,8 @@
                 <FrameLayout
                     android:id="@+id/player_container"
                     android:layout_width="match_parent"
-                    android:layout_height="210dp"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
                     android:background="@drawable/bg_player_window"
                     android:foreground="@drawable/bg_player_focus"
                     android:foregroundGravity="fill"
@@ -386,7 +388,8 @@
                     android:id="@+id/keyboard_area"
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
-                    android:layout_weight="0.50"
+                    android:layout_weight="1"
+                    android:minHeight="150dp"
                     android:orientation="vertical"
                     android:background="@drawable/bg_keyboard_area"
                     android:padding="8dp">
@@ -501,7 +504,7 @@
                     android:id="@+id/rank_category_grid"
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
-                    android:layout_weight="0.50"
+                    android:layout_weight="1"
                     android:orientation="vertical"
                     android:paddingTop="10dp"
                     android:visibility="gone" />
@@ -512,7 +515,7 @@
                 android:id="@+id/right_column"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="0.58"
+                android:layout_weight="0.40"
                 android:orientation="vertical">
 
                 <View
@@ -543,18 +546,26 @@
                             android:id="@+id/breadcrumb_home"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:singleLine="true"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:includeFontPadding="false"
                             android:text="‹ 主页"
                             android:textColor="#FF27CCA4"
-                            android:textSize="14sp" />
+                            android:textSize="13sp" />
 
                         <TextView
                             android:id="@+id/breadcrumb_current"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="6dp"
+                            android:singleLine="true"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:includeFontPadding="false"
                             android:text=""
                             android:textColor="#FFF"
-                            android:textSize="14sp" />
+                            android:textSize="13sp" />
                     </LinearLayout>
 
                     <!-- 右侧导航/品牌/返回 -->
@@ -625,7 +636,7 @@
                     android:layout_weight="1"
                     android:orientation="vertical">
 
-                    <ListView
+                    <com.local.ktv.TvListView
                         android:id="@+id/song_list"
                         android:layout_width="match_parent"
                         android:layout_height="0dp"

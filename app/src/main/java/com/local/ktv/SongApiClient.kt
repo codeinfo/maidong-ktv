@@ -113,6 +113,7 @@ object SongApiClient {
         .joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
     private fun httpGet(url: String): String {
+        TlsCompat.install()
         val connection = URL(url).openConnection() as HttpURLConnection
         return try {
             connection.requestMethod = "GET"

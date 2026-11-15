@@ -45,7 +45,10 @@ class SongListAdapter(
     private val callbacks: SongListCallbacks,
 ) : BaseAdapter() {
     private val density = context.resources.displayMetrics.density
-    private val columns = if (mode in SINGLE_COLUMN_MODES) 1 else 2
+    // 窄屏（手机横屏 640dp 宽）右栏只有 ~200dp，两列会把歌名压成一个字
+    private val columns = if (mode in SINGLE_COLUMN_MODES ||
+        context.resources.configuration.screenWidthDp < 800
+    ) 1 else 2
     private val cardIds = HashMap<String, Int>()
 
     private fun cardId(index: Int): Int = cardIds.getOrPut(songKey(songs[index])) { View.generateViewId() }
@@ -101,14 +104,14 @@ class SongListAdapter(
         return LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(12), dp(4), 0, dp(4))
+            setPadding(dp(10), dp(4), dp(2), dp(4))
             setBackgroundResource(R.drawable.ott_bg_item)
             val info = songInfo(song, stacked = true)
             addView(info, LinearLayout.LayoutParams(0, dp(52), 1f))
             if (!state.local || state.queued) {
-                addView(icon(if (state.queued) R.drawable.ic_order_song else R.drawable.ott_ic_download, null), LinearLayout.LayoutParams(dp(40), dp(40)))
+                addView(icon(if (state.queued) R.drawable.ic_order_song else R.drawable.ott_ic_download, null), LinearLayout.LayoutParams(dp(32), dp(32)))
             }
-            addView(icon(R.drawable.ott_ic_more, null), LinearLayout.LayoutParams(dp(40), dp(40)))
+            addView(icon(R.drawable.ott_ic_more, null), LinearLayout.LayoutParams(dp(32), dp(32)))
             configureSongCard(this, song, songIndex)
             if (songIndex >= columns) nextFocusUpId = cardId(songIndex - columns)
             if (column == 1) nextFocusLeftId = cardId(songIndex - 1)
@@ -212,6 +215,8 @@ class SongListAdapter(
     private fun songInfo(song: Song, stacked: Boolean): View = LinearLayout(context).apply {
         orientation = if (stacked) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
+        // 窄屏（640dp 宽）下固定宽度的图标会吃光行内空间，给文字列兜底最小宽度
+        minimumWidth = dp(60)
         if (stacked) {
             addView(text(song.title.orEmpty(), 16, Color.WHITE, Gravity.START or Gravity.CENTER_VERTICAL), LinearLayout.LayoutParams(-1, 0, 1f))
             addView(text(song.singer.orEmpty(), 14, Color.rgb(193, 193, 193), Gravity.START or Gravity.CENTER_VERTICAL), LinearLayout.LayoutParams(-1, 0, 1f))

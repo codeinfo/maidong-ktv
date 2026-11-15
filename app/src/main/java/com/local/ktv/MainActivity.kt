@@ -237,7 +237,7 @@ class MainActivity : AppCompatActivity() {
     private fun browsePageSize(): Int = when (browseMode) {
         "rank" -> 6
         "singer_list" -> 8
-        else -> MuseDatabase.PAGE_SIZE
+        else -> IgebaCatalog.PAGE_SIZE
     }
 
     /** 当前浏览类型:"hot"/"language"/"wordcount"/"singer"/"search"  */
@@ -375,6 +375,7 @@ class MainActivity : AppCompatActivity() {
         }.getOrElse { KtvStateDatabase.RestoredState(null, "idle") }
         currentSong = restoredState.currentSong
         playWhenPrepared = restoredState.playbackState != "paused"
+        val interruptedDownloads = ArrayList<Song>()
         runCatching {
             stateDatabase.restoreDownloads().forEach { snapshot ->
                 if (snapshot.status == "completed") return@forEach
@@ -382,19 +383,20 @@ class MainActivity : AppCompatActivity() {
                 downloads += DownloadTask(snapshot.song).apply {
                     progress = snapshot.progress
                     state = when (snapshot.status) {
-                        "queued", "downloading" -> "下载中断，可重试"
+                        "queued", "downloading" -> "下载中断，等待自动重试"
                         "completed" -> "完成"
                         "failed" -> "失败：${snapshot.error.orEmpty()}"
                         else -> snapshot.status
                     }
                 }
                 if (snapshot.status == "queued" || snapshot.status == "downloading") {
+                    interruptedDownloads += snapshot.song
                     stateDatabase.updateDownload(
                         snapshot.song,
                         "failed",
                         snapshot.progress,
                         snapshot.localPath,
-                        "应用重启，等待重试",
+                        "应用重启，等待自动重试",
                     )
                 }
             }
@@ -414,18 +416,33 @@ class MainActivity : AppCompatActivity() {
         // Keep initialization on the loading state until the external catalog is ready.
         showDatabaseLoading(true, "正在初始化曲库...", null)
         io.execute(Runnable {
+            // 旧版本把歌曲存在 cloud-songNNNN/ 或 songs/，先迁到统一目录，避免「下过还要重下」
+            runCatching { LegacyStorageUpgrade.run() }
+                .onFailure { AppLog.e("StorageUpgrade", "旧目录迁移失败", it) }
             var ok = library.muse.open()
+            // 歌星页头像：启动后预热首页那批，进页面即出图（后台低优先级，失败不影响主流程）
+            if (ok) {
+                runCatching {
+                    SingerAvatarLoader.warmUp(library.muse.singers(null, null, 0, 48), 40)
+                }.onFailure { AppLog.w("SingerAvatar", "头像预热启动失败：${it.message}") }
+                // QA 直达：本机 input tap 在应用内不生效、只能靠方向键，验证某个页面代价很高。
+                // debug 包支持 am start --es qa_open singers|local 直接进对应页，正式包不生效。
+                maybeOpenQaPage()
+            }
             var bootstrapError: Throwable? = null
             if (!ok) {
-                val result = DatabaseBootstrapper.download { value ->
-                    main.post { showDatabaseLoading(true, "正在下载曲库 ${value}%", value) }
+                // 曲库已切换为 i歌霸内置目录：首次启动从 assets 解压，不再下载 muse.db
+                val result = runCatching {
+                    library.muse.prepareAssets { value ->
+                        main.post { showDatabaseLoading(true, "正在解压曲库 $value%", value) }
+                    }
                 }
                 bootstrapError = result.exceptionOrNull()
                 ok = result.isSuccess && library.muse.open()
             }
             val count = if (ok) library.muse.songCount() else 0
             if (ok) {
-                val pageSize = MuseDatabase.PAGE_SIZE
+                val pageSize = IgebaCatalog.PAGE_SIZE
                 val songs = library.muse.hotSongs(0, pageSize * 2)
                 synchronized(browseCountCache) { browseCountCache["hot\u0001\u0001全部\u0001"] = count }
                 songs.chunked(pageSize).forEachIndexed { page, pageSongs ->
@@ -438,6 +455,8 @@ class MainActivity : AppCompatActivity() {
                     refreshLibrary(Runnable {
                         showDatabaseLoading(false, "", null)
                         showHomePage()
+                        maybeShowGuestHint()
+                        resumeInterruptedDownloads(interruptedDownloads)
                         if (currentSong == null && orderQueue!!.isEmpty()) startIdlePublicPlayback()
                         if (catalogRefreshPending) refreshCurrentCatalogPage()
                     })
@@ -1431,7 +1450,8 @@ class MainActivity : AppCompatActivity() {
 
         val menuItems = arrayOf<String?>(
             "🎤  演唱模式", "🔊  音频控制", "🌐  声道设置", "🎚  音调控制",
-            "📺  画面设置", "🎵  公播设置", "📃  跑马灯", "📶  网络设置", "ℹ  关于"
+            "📺  画面设置", "🎵  公播设置", "📃  跑马灯", "📶  网络设置", "ℹ  关于",
+            "🎧  音源"
         )
         val adapter: ArrayAdapter<String?> =
             object : ArrayAdapter<String?>(this, R.layout.settings_menu_item, menuItems) {
@@ -1586,6 +1606,48 @@ class MainActivity : AppCompatActivity() {
                     if (library.muse.isAvailable()) "已加载 (" + library.muse.songCount() + " 首)" else "未加载",
                     null
                 )
+            }
+
+            9 -> {
+                // 音源
+                addSettingsTitle(content, "音源")
+                addSettingsItem(
+                    content,
+                    "i歌霸账号",
+                    IgebaAccount.statusText() + "（点此登录或切换账号）",
+                    View.OnClickListener { v: View? ->
+                        IgebaAccountDialog.show(this) { renderSettingsContent(content, 9) }
+                    })
+                if (IgebaAccount.session != null) {
+                    addSettingsItem(
+                        content,
+                        "退出登录",
+                        "清除本机保存的 i歌霸账号与会话",
+                        View.OnClickListener { v: View? ->
+                            IgebaAccount.logout()
+                            renderSettingsContent(content, 9)
+                        })
+                }
+                addSettingsItem(
+                    content,
+                    "登录说明",
+                    "不登录也能点歌、下载、播放（服务端按游客限速）；登录后可去掉广告与限速策略",
+                    null
+                )
+                addSettingsItem(content, "取地址顺序", SongSourceRouter.describe(), null)
+                addSettingsItem(
+                    content,
+                    "下载缓存",
+                    OwnedSongCacheCleaner.scan().describe() + "　（" + DownloadSpaceBudget.describeAvailable() + "）",
+                    View.OnClickListener { v: View? -> confirmCleanSongCache(content) }
+                )
+                addSettingsItem(
+                    content,
+                    "本地镜像",
+                    BuildConfig.MEDIA_BASE_URL.trim().ifEmpty { "未配置（gradle.properties 的 MEDIA_BASE_URL）" },
+                    null
+                )
+                addSettingsItem(content, "i歌霸曲库", library.muse.catalogInfo(), null)
             }
         }
     }
@@ -3731,11 +3793,11 @@ class MainActivity : AppCompatActivity() {
         handleSong(song)
     }
 
-    val muse: MuseDatabase
+    val muse: IgebaCatalog
         /**
          * 获取 Muse 曲库数据库访问层(供 Fragment 查询歌曲/歌手/排行)。
          * 
-         * @return 全局 MuseDatabase 实例
+         * @return 全局 IgebaCatalog 实例
          */
         get() = library.muse
 
@@ -3782,16 +3844,22 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun download(song: Song) {
-        val mainUrl = if (song.downloadUrl == null || song.downloadUrl!!.trim { it <= ' ' }
-                .isEmpty()) song.videoUrl else song.downloadUrl
-        if (mainUrl == null || mainUrl.trim { it <= ' ' }.isEmpty()) {
-            toast("该条目没有下载地址")
-            return
-        }
+        val readyUrl = if (song.downloadUrl.isNullOrBlank()) song.videoUrl else song.downloadUrl
         val task = DownloadTask(song)
         downloads.add(task)
         busy(true, "正在下载：" + song.title)
         io.execute(Runnable {
+            // 本地曲库条目没有现成地址，需按「镜像 → i歌霸 → 内置接口」现取，网络请求必须在后台线程
+            val mainUrl = if (readyUrl == null || readyUrl.trim { it <= ' ' }.isEmpty()) {
+                SongSourceRouter.resolve(song)?.url
+            } else {
+                readyUrl
+            }
+            if (mainUrl == null || mainUrl.trim { it <= ' ' }.isEmpty()) {
+                task.state = "失败：没有下载地址"
+                main.post(Runnable { busy(false, "该条目没有下载地址") })
+                return@Runnable
+            }
             val target = library.targetFor(song)
             try {
                 downloadToFile(mainUrl, target, task, 0, 75)
@@ -4010,8 +4078,7 @@ class MainActivity : AppCompatActivity() {
             try {
                 var url = song.downloadUrl
                 if (url == null || url.isEmpty()) {
-                    url = getSongDownloadUrl(extractTid(song))
-                    if (url != null) song.downloadUrl = url
+                    url = SongSourceRouter.resolve(song)?.url
                 }
                 if (url == null || url.isEmpty()) {
                     main.post(Runnable {
@@ -4113,6 +4180,20 @@ class MainActivity : AppCompatActivity() {
                 main.post(Runnable {
                     hideDownloadProgress()
                     toast("下载失败: " + error)
+                    if (IgebaAccount.session == null) {
+                        AlertDialog.Builder(this@MainActivity)
+                            .setTitle("下载失败")
+                            .setMessage(
+                                "当前为 i歌霸游客模式（未登录会被服务端限速或限制）。\n失败原因：" + error +
+                                    "\n\n是否现在登录 i歌霸账号？"
+                            )
+                            .setPositiveButton("去登录") { _: DialogInterface?, _: Int ->
+                                IgebaAccountDialog.show(this@MainActivity) {}
+                            }
+                            .setNegativeButton("继续游客", null)
+                            .create()
+                            .show()
+                    }
                 })
             }
         })
@@ -4234,7 +4315,7 @@ class MainActivity : AppCompatActivity() {
         busy(true, "正在从云端下载:" + song.title)
         io.execute(Runnable {
             val target =
-                File(MuseDatabase.VIDEO_ROOT + "/" + MuseDatabase.CLOUD_SONG_DIR, song.filename)
+                File(IgebaCatalog.VIDEO_ROOT + "/" + IgebaCatalog.CLOUD_SONG_DIR, song.filename)
             try {
                 File(target.getParent()).mkdirs()
                 downloadToFile(url, target, task, 0, 100)
@@ -5457,7 +5538,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun listView(): ListView {
-        val view = ListView(this)
+        // TvListView 走显式遥控器导航（TvListNavigation）：上下换行、左右在行内移动
+        val view = TvListView(this)
+        AppLog.i("TvListNav", "list created ${view.javaClass.simpleName}")
         view.setBackgroundColor(PANEL_2)
         view.setCacheColorHint(Color.TRANSPARENT)
         // 分割线:半透明白色,1px 高
@@ -5813,7 +5896,8 @@ class MainActivity : AppCompatActivity() {
         topBrandName?.visibility = View.GONE
         btnTopSearch?.visibility = View.GONE
         bottomBar?.visibility = View.GONE
-        updateContentFrameMargins(0, 0)
+        // 子页面仍保留顶栏的播放控制按钮，内容区必须让出顶栏高度，否则播放器会压住按钮
+        updateContentFrameMargins(dp(64), 0)
         val shell = findViewById<View?>(R.id.main_layout)
         if (shell != null) shell.setVisibility(View.VISIBLE)
         if (breadcrumbCurrent != null) {
@@ -6340,7 +6424,10 @@ class MainActivity : AppCompatActivity() {
             val tab = TextView(this)
             bindTab(tab, tabs[i].orEmpty(), index)
             installPressFeedback(tab)
-            tabContainer!!.addView(tab, LinearLayout.LayoutParams(dp(76), -1))
+            // 1280×720 下右栏较窄，Tab 宽度过大会挤占面包屑，导致文字被裁切
+            tabContainer!!.addView(tab, LinearLayout.LayoutParams(dp(62), -1).apply {
+                if (i > 0) setMargins(dp(4), 0, 0, 0)
+            })
         }
         restoreFocusBookmark(focusedTab)
     }
@@ -6680,9 +6767,11 @@ class MainActivity : AppCompatActivity() {
                 val index = rowIndex * 3 + columnIndex
                 val tile = TextView(this).apply {
                     text = title
-                    textSize = 14f
+                    textSize = 13f
                     setTextColor(Color.WHITE)
                     gravity = Gravity.CENTER
+                    maxLines = 1
+                    setPadding(dp(4), dp(2), dp(4), dp(2))
                     isClickable = true
                     isFocusable = true
                     setBackgroundResource(
@@ -6690,7 +6779,8 @@ class MainActivity : AppCompatActivity() {
                         else R.drawable.ott_bg_rank_item_not_selected
                     )
                     val trophy = AppCompatResources.getDrawable(this@MainActivity, R.drawable.ic_default_rank_avatar)?.mutate()
-                    trophy?.setBounds(0, 0, dp(42), dp(42))
+                    // 720p 下左列每行仅约 93px（62dp），图标超过约 30dp 就会把文字挤出按钮
+                    trophy?.setBounds(0, 0, dp(30), dp(30))
                     setCompoundDrawables(null, trophy, null, null)
                     compoundDrawablePadding = dp(1)
                     setOnClickListener {
@@ -6890,6 +6980,23 @@ class MainActivity : AppCompatActivity() {
     /**
      * 加载歌手列表
      */
+    /** 仅 debug 包：`am start ... --es qa_open singers` 直接进歌星页，用于无触摸输入设备上的验证。 */
+    private fun maybeOpenQaPage() {
+        if (!BuildConfig.DEBUG) return
+        val target = intent?.getStringExtra("qa_open")?.trim().orEmpty()
+        if (target.isEmpty()) return
+        // 放到启动流程末尾再打开，否则会被首屏渲染/曲库回调覆盖回首页
+        main.postDelayed({
+            when (target) {
+                "singers" -> loadSingers()
+                "local" -> showLocalPage()
+                "guess" -> showGuessPage()
+                else -> AppLog.w("KeyTrace", "未知 qa_open=$target")
+            }
+            AppLog.i("KeyTrace", "qa_open 已打开 $target")
+        }, 1500L)
+    }
+
     private fun loadSingers() {
         searchScope = "singer"
         activeSearchQuery = ""
@@ -7063,7 +7170,7 @@ class MainActivity : AppCompatActivity() {
         val query = activeSearchQuery.trim().uppercase(Locale.ROOT)
         val requestedPage = browsePage
         val requestVersion = ++browseRequestVersion
-        val pageSize = MuseDatabase.PAGE_SIZE
+        val pageSize = IgebaCatalog.PAGE_SIZE
         io.execute {
             val localSongs = localSongInventory()
             downloads.asSequence().map { it.song }
@@ -7250,21 +7357,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun downloadedSongDirectory(): File =
-        File(MuseDatabase.VIDEO_ROOT, MuseDatabase.CLOUD_SONG_DIR)
+        File(IgebaCatalog.VIDEO_ROOT, IgebaCatalog.CLOUD_SONG_DIR)
 
     private fun countDownloadedFiles(): Int = localSongInventory().size
 
     private fun localSongInventory(): LinkedHashMap<String, Song> {
         val result = LinkedHashMap<String, Song>()
         library.muse.localPathSongs().forEach { song ->
-            val resolved = File(MuseDatabase.resolveSongFilePath(song))
+            val resolved = File(IgebaCatalog.resolveSongFilePath(song))
             if (resolved.isFile && resolved.length() >= SongOkDownloadManager.MIN_VALID_FILE_SIZE) {
                 song.path = resolved.absolutePath
                 result.getOrPut(stableId(song)) { song }
             }
         }
 
-        val downloadedFiles = MuseDatabase.songDirectories()
+        val downloadedFiles = IgebaCatalog.songDirectories()
             .flatMap { it.listFiles().orEmpty().asIterable() }
             .distinctBy { it.name }
         downloadedFiles.filter {
@@ -7343,9 +7450,11 @@ class MainActivity : AppCompatActivity() {
         showDatabaseLoading(true, "正在重置数据库...", null)
         io.execute {
             library.muse.close()
-            library.muse.dbFile()?.let { runCatching { it.delete() } }
-            val result = DatabaseBootstrapper.download { progressValue ->
-                main.post { showDatabaseLoading(true, "正在下载曲库 ${progressValue}%", progressValue) }
+            library.muse.dbFile().let { runCatching { it.delete() } }
+            val result = runCatching {
+                library.muse.prepareAssets { progressValue ->
+                    main.post { showDatabaseLoading(true, "正在解压曲库 $progressValue%", progressValue) }
+                }
             }
             val opened = result.isSuccess && library.muse.open()
             main.post {
@@ -7932,7 +8041,7 @@ class MainActivity : AppCompatActivity() {
         val pageSize = when (requestedMode) {
             "rank" -> 6
             "singer_list" -> 8
-            else -> MuseDatabase.PAGE_SIZE
+            else -> IgebaCatalog.PAGE_SIZE
         }
         val key = BrowseCacheKey(
             requestedMode,
@@ -8473,8 +8582,73 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * 启动恢复：把上次没下完的歌捡回来重跑（最多 3 首，串行）。
+     * 恢复前把任务状态与数据库同步成「下载中」，让列表能反映真实进度。
+     */
+    private fun resumeInterruptedDownloads(candidates: List<Song>) {
+        if (candidates.isEmpty()) return
+        IgebaDownloadRecovery.resume(candidates) { song ->
+            main.post(Runnable {
+                downloads.firstOrNull { it.song == song }?.state = "重新下载中"
+            })
+            runCatching {
+                stateDatabase?.updateDownload(song, "downloading", 0, song.path, "启动自动恢复")
+            }
+        }
+    }
+
+    /**
+     * 清理自有下载缓存：只删本应用命名的 `<编号>.<mkv|mp4|ts>`（含半成品），
+     * 用户自己拷进来的文件（如 wav/mp3）一律不动。
+     */
+    private fun confirmCleanSongCache(content: LinearLayout) {
+        val summary = OwnedSongCacheCleaner.scan()
+        if (summary.files == 0) {
+            toast("没有可清理的下载缓存")
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("清理下载缓存")
+            .setMessage(
+                "将删除应用自己下载的 " + summary.describe() + "。\n" +
+                    "你自己拷进 " + AppPaths.cloudSongsDir.name + " 目录的文件不会被删除。"
+            )
+            .setPositiveButton("清理") { _: DialogInterface?, _: Int ->
+                val keep = HashSet<String>()
+                currentSong?.sourceSongNumber?.let { keep.add(it) }
+                downloads.forEach { task ->
+                    task.song.sourceSongNumber?.let { keep.add(it) }
+                }
+                val cleaned = OwnedSongCacheCleaner.clean(keep = keep)
+                // 清完杀掉可能残留的半成品任务，避免拿着已删除的文件继续重试
+                downloads.forEach { task ->
+                    if (!SongOkDownloadManager.isDownloaded(task.song)) task.song.path = null
+                }
+                toast("已清理 " + cleaned.describe())
+                renderSettingsContent(content, 9)
+            }
+            .setNegativeButton("取消", null)
+            .create()
+            .show()
+    }
+
     private fun toast(text: String?) {
         Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
+    }
+
+    /**
+     * 首次启动提示未登录状态。
+     * 现场最容易踩的坑是「找不到登录入口」：入口在 设置 → 🎧 音源，而游客其实已经能点歌下载。
+     */
+    private fun maybeShowGuestHint() {
+        if (IgebaAccount.session != null) return
+        val prefs = prefs() ?: return
+        if (prefs.getBoolean(KEY_GUEST_HINT_SHOWN, false)) return
+        prefs.edit().putBoolean(KEY_GUEST_HINT_SHOWN, true).apply()
+        main.postDelayed(Runnable {
+            toast("i歌霸当前是游客模式：不登录也能点歌、下载、播放（服务端限速）；登录入口在 设置 → 🎧 音源")
+        }, 3_000L)
     }
 
     private fun prefs(): SharedPreferences? {
@@ -8637,6 +8811,9 @@ class MainActivity : AppCompatActivity() {
         if (event.getAction() != KeyEvent.ACTION_DOWN) return super.dispatchKeyEvent(event)
         focusRestoreSerial++
         val code = event.getKeyCode()
+        // 现场排障用：遥控器按键落在哪个控件上，直接看 app.log 的 KeyTrace 即可
+        val focusBefore = describeFocus()
+        AppLog.i("KeyTrace", "key=$code focus=$focusBefore")
         if (isFullScreen) {
             val center = code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER ||
                 code == KeyEvent.KEYCODE_NUMPAD_ENTER
@@ -8715,6 +8892,18 @@ class MainActivity : AppCompatActivity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) window.decorView.post { prepareTvFocusableTree(window.decorView) }
+    }
+
+    /** 当前焦点控件的可读描述：类名 + 文字/内容描述 + 位置，用于日志定位遥控器导航走位。 */
+    private fun describeFocus(): String {
+        val focused = window.decorView.findFocus() ?: return "none"
+        val label = when (focused) {
+            is android.widget.TextView -> focused.text?.toString().orEmpty()
+            else -> focused.contentDescription?.toString().orEmpty()
+        }
+        val location = IntArray(2).also { focused.getLocationOnScreen(it) }
+        return "${focused.javaClass.simpleName}@${location[0]},${location[1]}" +
+            (if (label.isNotEmpty()) "[$label]" else "")
     }
 
     private fun navigateBack() {
@@ -9039,6 +9228,7 @@ class MainActivity : AppCompatActivity() {
         private val DIVIDER = Color.argb(80, 241, 241, 241)
         private const val PREFS = "ktv"
         private const val KEY_CATALOG_URL = "catalog_url"
+        private const val KEY_GUEST_HINT_SHOWN = "igeba_guest_hint_shown"
 
         private const val TAG = "MainActivity"
     }

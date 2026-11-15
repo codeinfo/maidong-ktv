@@ -105,6 +105,8 @@ class KtvPlaybackEngine(context: Context) {
     }
 
     private var ijkPlayer: IjkMediaPlayer? = null
+    private var platformPlayer: MediaPlayer? = null
+    private var ijkNativeUnavailable = false
     private var targetView: KtvVideoView? = null
     private var prepared = false
     private var startWhenPrepared = false
@@ -114,14 +116,21 @@ class KtvPlaybackEngine(context: Context) {
     private var videoWidth = 0
     private var videoHeight = 0
 
-    val isPlaying: Boolean get() = runCatching { ijkPlayer?.isPlaying == true }.getOrDefault(false)
+    val isPlaying: Boolean
+        get() = runCatching {
+            ijkPlayer?.isPlaying == true || platformPlayer?.isPlaying == true
+        }.getOrDefault(false)
     val currentPosition: Int get() = runCatching {
-        (ijkPlayer?.currentPosition ?: 0L)
-            .coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
+        val position = ijkPlayer?.currentPosition
+            ?: platformPlayer?.currentPosition?.toLong()
+            ?: 0L
+        position.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
     }.getOrDefault(0)
     val duration: Int get() = runCatching {
-        (ijkPlayer?.duration ?: 0L)
-            .coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
+        val total = ijkPlayer?.duration
+            ?: platformPlayer?.duration?.toLong()
+            ?: 0L
+        total.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
     }.getOrDefault(0)
 
     fun setOnPreparedListener(listener: MediaPlayer.OnPreparedListener?) {
@@ -155,6 +164,7 @@ class KtvPlaybackEngine(context: Context) {
                 if (targetView === view) {
                     Log.i(TAG, "surfaceDestroyed")
                     runCatching { ijkPlayer?.setDisplay(null) }
+                    runCatching { platformPlayer?.setDisplay(null) }
                 }
             }
         })
@@ -176,16 +186,32 @@ class KtvPlaybackEngine(context: Context) {
                 if (retryAttempt == null || retryAttempt.isFailure) {
                     Log.e(
                         TAG,
-                        "IJK recreate failed; platform fallback is disabled",
+                        "IJK recreate failed; falling back to platform MediaPlayer",
                         retryAttempt?.exceptionOrNull(),
                     )
-                    prepared = false
-                    errorListener?.onError(null, MediaPlayer.MEDIA_ERROR_UNKNOWN, 0)
+                    playWithPlatform(uri)
                 }
             }
         } else {
+            // 设备/模拟器缺少 armeabi-v7a 原生库时（如 x86 模拟器）IJK 不可用，
+            // 退回系统 MediaPlayer，让播放链路仍可跑通与验证。
+            Log.w(TAG, "IJK unavailable (native libs missing?); falling back to platform MediaPlayer")
+            playWithPlatform(uri)
+        }
+    }
+
+    private fun playWithPlatform(uri: Uri) {
+        val player = ensurePlatformPlayer()
+        if (player == null) {
             prepared = false
-            Log.e(TAG, "IJK unavailable; platform fallback is disabled")
+            errorListener?.onError(null, MediaPlayer.MEDIA_ERROR_UNKNOWN, 0)
+            return
+        }
+        val attempt = runCatching { preparePlatformPlayer(player, uri) }
+        if (attempt.isFailure) {
+            Log.e(TAG, "platform prepare failed", attempt.exceptionOrNull())
+            releasePlatform()
+            prepared = false
             errorListener?.onError(null, MediaPlayer.MEDIA_ERROR_UNKNOWN, 0)
         }
     }
@@ -207,20 +233,29 @@ class KtvPlaybackEngine(context: Context) {
             return
         }
         Log.i(TAG, "start prepared player")
-        runCatching { ijkPlayer?.start() }
+        if (ijkPlayer != null) {
+            runCatching { ijkPlayer?.start() }
+        } else {
+            runCatching { platformPlayer?.start() }
+        }
     }
 
     fun pause() {
         startWhenPrepared = false
         runCatching {
             if (ijkPlayer?.isPlaying == true) ijkPlayer?.pause()
+            if (platformPlayer?.isPlaying == true) platformPlayer?.pause()
         }
     }
 
     fun seekTo(positionMs: Int) {
         val target = positionMs.coerceAtLeast(0)
         runCatching {
-            ijkPlayer?.seekTo(target.toLong())
+            if (ijkPlayer != null) {
+                ijkPlayer?.seekTo(target.toLong())
+            } else {
+                platformPlayer?.seekTo(target)
+            }
         }
     }
 
@@ -228,12 +263,14 @@ class KtvPlaybackEngine(context: Context) {
         startWhenPrepared = false
         prepared = false
         runCatching { ijkPlayer?.stop() }
+        runCatching { platformPlayer?.pause() }
     }
 
     fun setVolume(left: Float, right: Float) {
         val safeLeft = left.coerceIn(0f, 1f)
         val safeRight = right.coerceIn(0f, 1f)
         runCatching { ijkPlayer?.setVolume(safeLeft, safeRight) }
+        runCatching { platformPlayer?.setVolume(safeLeft, safeRight) }
     }
 
     fun selectAudioTrack(original: Boolean): Boolean = runCatching {
@@ -270,10 +307,12 @@ class KtvPlaybackEngine(context: Context) {
         startWhenPrepared = false
         prepared = false
         releaseIjk()
+        releasePlatform()
         targetView = null
     }
 
     private fun ensureIjkPlayer(): IjkMediaPlayer? {
+        if (ijkNativeUnavailable) return null
         ijkPlayer?.let { return it }
         return runCatching {
             IjkMediaPlayer().also {
@@ -285,7 +324,15 @@ class KtvPlaybackEngine(context: Context) {
                 )
             }
         }
-            .onFailure { Log.e(TAG, "Cannot create IJK player", it) }
+            .onFailure {
+                // 原生库 ABI 不匹配（如 x86 模拟器只有 armeabi-v7a 库）时记下结论，
+                // 后续每次播放直接走平台 MediaPlayer，避免反复抛 UnsatisfiedLinkError。
+                val cause = it.cause ?: it
+                if (cause is UnsatisfiedLinkError || cause is NoClassDefFoundError) {
+                    ijkNativeUnavailable = true
+                }
+                Log.w(TAG, "IJK unavailable: ${cause.javaClass.simpleName}: ${cause.message}")
+            }
             .getOrNull()
     }
 
@@ -336,6 +383,60 @@ class KtvPlaybackEngine(context: Context) {
     private fun setOutputHolder(holder: SurfaceHolder) {
         Log.i(TAG, "setOutputHolder valid=${holder.surface?.isValid == true}")
         runCatching { ijkPlayer?.setDisplay(holder) }
+        runCatching { platformPlayer?.setDisplay(holder) }
+    }
+
+    private fun ensurePlatformPlayer(): MediaPlayer? = runCatching {
+        platformPlayer ?: MediaPlayer().also {
+            configurePlatform(it)
+            platformPlayer = it
+        }
+    }
+        .onFailure { Log.e(TAG, "Cannot create platform player", it) }
+        .getOrNull()
+
+    private fun configurePlatform(player: MediaPlayer) {
+        player.setAudioStreamType(AudioManager.STREAM_MUSIC)
+        player.setScreenOnWhilePlaying(true)
+        player.setOnPreparedListener { preparedPlayer ->
+            prepared = true
+            videoWidth = preparedPlayer.videoWidth
+            videoHeight = preparedPlayer.videoHeight
+            targetView?.updateVideoSize(videoWidth, videoHeight)
+            Log.i(TAG, "platform onPrepared size=${videoWidth}x$videoHeight deferred=$startWhenPrepared")
+            preparedListener?.onPrepared(null)
+            if (startWhenPrepared && !preparedPlayer.isPlaying) {
+                Log.i(TAG, "starting deferred platform player")
+                runCatching { preparedPlayer.start() }
+            }
+        }
+        player.setOnVideoSizeChangedListener { _, width, height ->
+            videoWidth = width
+            videoHeight = height
+            targetView?.updateVideoSize(width, height)
+        }
+        player.setOnCompletionListener { completionListener?.onCompletion(null) }
+        player.setOnErrorListener { _, what, extra ->
+            prepared = false
+            Log.e(TAG, "platform onError what=$what extra=$extra")
+            errorListener?.onError(null, what, extra) ?: true
+        }
+    }
+
+    private fun preparePlatformPlayer(player: MediaPlayer, uri: Uri) {
+        player.reset()
+        configurePlatform(player)
+        targetView?.currentHolder()?.takeIf { it.surface?.isValid == true }?.let(player::setDisplay)
+        val source = if (uri.scheme.equals("file", true)) uri.path.orEmpty() else uri.toString()
+        Log.i(TAG, "platform prepare source=$source")
+        player.setDataSource(source)
+        player.prepareAsync()
+    }
+
+    private fun releasePlatform() {
+        runCatching { platformPlayer?.setDisplay(null) }
+        runCatching { platformPlayer?.release() }
+        platformPlayer = null
     }
 
     private fun releaseIjk() {

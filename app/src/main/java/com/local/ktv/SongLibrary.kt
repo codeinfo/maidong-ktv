@@ -10,7 +10,8 @@ class SongLibrary {
     private val indexFile = AppPaths.catalogFile
     private val localSongs = mutableListOf<Song>()
     private val remoteSongs = mutableListOf<Song>()
-    @JvmField val muse = MuseDatabase()
+    /** 点歌曲库：已从 Muse 切到 i歌霸内置目录（见 [IgebaCatalog]）。 */
+    @JvmField val muse = IgebaCatalog()
 
     fun ensureDirs() {
         rootDir.mkdirs()
