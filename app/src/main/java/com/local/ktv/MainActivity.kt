@@ -3933,6 +3933,7 @@ class MainActivity : AppCompatActivity() {
                 })
             } catch (e: Exception) {
                 task.state = "失败：" + e.message
+                AppLog.e("Download", "下载失败：${song.title}", e)
                 main.post(Runnable {
                     busy(false, "下载失败：" + e.message)
                     if (currentTabIndex == 6) loadDownloadedList()
@@ -4173,6 +4174,7 @@ class MainActivity : AppCompatActivity() {
                 })
             } catch (e: Exception) {
                 Log.e(TAG, "download error: " + e.message)
+                AppLog.e("Download", "下载失败（直连）：${song.title}", e)
                 if (tmpFile != null) tmpFile.delete()
                 main.post(Runnable {
                     hideDownloadProgress()
@@ -7914,7 +7916,7 @@ class MainActivity : AppCompatActivity() {
         }
         AlertDialog.Builder(this)
             .setTitle("网络设置")
-            .setMessage("IP: " + ip + "\n手机遥控端口: 8765\n扫码连接手机点歌")
+            .setMessage("IP: " + ip + "\n手机遥控端口: 8765\n日志下载: http://" + ip + ":8765/logs\n扫码连接手机点歌")
             .setPositiveButton("确定", null).create().showForTv(DialogInterface.BUTTON_POSITIVE)
     }
 

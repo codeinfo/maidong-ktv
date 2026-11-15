@@ -11,8 +11,8 @@ android {
         applicationId "com.local.ktv"
         minSdk 19
         targetSdk 25
-        versionCode 3
-        versionName "0.1"
+        versionCode 4
+        versionName "0.1.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
         // 曲库清单地址；分片按清单所在目录解析，镜像地址可指向同一份数据的其他托管位置。
