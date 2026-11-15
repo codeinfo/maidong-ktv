@@ -26,7 +26,7 @@
 | --- | --- |
 | applicationId | `com.local.ktv`（debug 变体加 `.qa` 后缀，可与正式包共存） |
 | minSdk / targetSdk / compileSdk | 19 / 25 / 35 |
-| versionName / versionCode | 0.1 / 3 |
+| versionName / versionCode | 0.1.2 / 5 |
 | 原生库 | 仅 `armeabi-v7a`（依赖 `app/libs` 内的 IJK 运行时，不支持 arm64/x86） |
 | 播放栈 | IJK（`KtvVideoView`），IJK 初始化失败时回落平台 MediaPlayer |
 | 工具链 | JDK 17、Gradle 8.13（wrapper）、AGP 8.2.2、Kotlin 1.9.22 |

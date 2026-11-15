@@ -278,6 +278,20 @@ internal object IgebaAccount {
         }
     }
 
+    /**
+     * 列表卡片/弹窗单行展示用：一眼看出「有没有登录」。
+     * 游客再分「存过账号可自动登录」和「完全没账号」，是因为排查取地址、下载失败时这两种含义不同。
+     */
+    @Synchronized
+    fun statusShort(): String {
+        val current = session
+        return when {
+            current != null -> "已登录：" + current.nickname
+            automaticLoginEnabled -> "游客 · 存有账号可自动登录"
+            else -> "游客 · 未登录（限速）"
+        }
+    }
+
     fun canAutoLogin(): Boolean = synchronized(this) { credentials != null }
 
     /**

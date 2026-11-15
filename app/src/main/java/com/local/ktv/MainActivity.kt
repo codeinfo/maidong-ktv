@@ -1612,7 +1612,7 @@ class MainActivity : AppCompatActivity() {
                 // 关于
                 addSettingsTitle(content, "关于")
                 addSettingsItem(content, "应用名称", "麦动", null)
-                addSettingsItem(content, "版本号", "1.0.0", null)
+                addSettingsItem(content, "版本号", BuildConfig.VERSION_NAME + "（" + BuildConfig.VERSION_CODE + "）", null)
                 addSettingsItem(
                     content,
                     "曲库",
@@ -7333,6 +7333,9 @@ class MainActivity : AppCompatActivity() {
         browsePagination?.visibility = View.GONE
 
         val entries = listOf(
+            SettingsEntry(R.drawable.ott_ic_media, "i歌霸账号", IgebaAccount.statusShort() + "　（音源与下载速度）", "登录") {
+                IgebaAccountDialog.show(this) { showSettingsPage(false) }
+            },
             SettingsEntry(R.drawable.ott_ic_data_setting, "数据设置", "数据库、歌曲下载、歌曲文件相关设置") { showSettingsSection(1) },
             SettingsEntry(R.drawable.ott_ic_play, "播放设置", "播放器、视频窗口相关设置") { showSettingsSection(2) },
             SettingsEntry(R.drawable.ott_ic_sound, "声音设置") { showSoundSettingsDialog() },
@@ -7916,7 +7919,7 @@ class MainActivity : AppCompatActivity() {
         }
         AlertDialog.Builder(this)
             .setTitle("网络设置")
-            .setMessage("IP: " + ip + "\n手机遥控端口: 8765\n日志下载: http://" + ip + ":8765/logs\n扫码连接手机点歌")
+            .setMessage("IP: " + ip + "\n手机遥控端口: 8765\n日志下载: http://" + ip + ":8765/logs\ni歌霸账号: " + IgebaAccount.statusShort() + "\n扫码连接手机点歌")
             .setPositiveButton("确定", null).create().showForTv(DialogInterface.BUTTON_POSITIVE)
     }
 
@@ -7926,7 +7929,8 @@ class MainActivity : AppCompatActivity() {
             .setMessage(
                 "power by 抖音@杨家三郎\n" +
                     "此软件免费开源，请勿付费获取\n" +
-                    "版本：" + BuildConfig.VERSION_NAME
+                    "版本：" + BuildConfig.VERSION_NAME + "（" + BuildConfig.VERSION_CODE + "）\n" +
+                    "i歌霸账号：" + IgebaAccount.statusShort()
             )
             .setPositiveButton("确定", null).create().showForTv(DialogInterface.BUTTON_POSITIVE)
     }
